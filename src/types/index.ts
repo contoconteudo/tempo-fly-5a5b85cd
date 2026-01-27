@@ -4,9 +4,11 @@ export type ObjectiveStatus = "on_track" | "at_risk" | "behind";
 
 export interface ProgressLog {
   id: string;
-  date: string;
+  month: number; // 1-12
+  year: number;
   value: number;
   description: string;
+  date: string; // data do registro
 }
 
 export interface Objective {

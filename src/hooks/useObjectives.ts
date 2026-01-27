@@ -17,8 +17,8 @@ const initialObjectives: Objective[] = [
     status: "on_track",
     createdAt: "2026-01-01",
     progressLogs: [
-      { id: "log1", date: "2026-01-15", value: 32000, description: "Fechamento de janeiro" },
-      { id: "log2", date: "2026-01-25", value: 36000, description: "Novo cliente Tech Solutions" },
+      { id: "log1", month: 1, year: 2026, date: "2026-01-15", value: 32000, description: "Fechamento de janeiro" },
+      { id: "log2", month: 1, year: 2026, date: "2026-01-25", value: 36000, description: "Novo cliente Tech Solutions" },
     ],
   },
   {
@@ -32,9 +32,9 @@ const initialObjectives: Objective[] = [
     status: "on_track",
     createdAt: "2026-01-01",
     progressLogs: [
-      { id: "log3", date: "2026-01-10", value: 1, description: "Cliente Tech Solutions" },
-      { id: "log4", date: "2026-01-18", value: 2, description: "Cliente Fashion Store" },
-      { id: "log5", date: "2026-01-22", value: 3, description: "Cliente Clínica Premium" },
+      { id: "log3", month: 1, year: 2026, date: "2026-01-10", value: 1, description: "Cliente Tech Solutions" },
+      { id: "log4", month: 1, year: 2026, date: "2026-01-18", value: 2, description: "Cliente Fashion Store" },
+      { id: "log5", month: 1, year: 2026, date: "2026-01-22", value: 3, description: "Cliente Clínica Premium" },
     ],
   },
   {
@@ -117,9 +117,11 @@ export function useObjectives() {
   );
 
   const addProgressLog = useCallback(
-    (objectiveId: string, value: number, description: string) => {
+    (objectiveId: string, month: number, year: number, value: number, description: string) => {
       const log: ProgressLog = {
         id: crypto.randomUUID(),
+        month,
+        year,
         date: new Date().toISOString().split("T")[0],
         value,
         description,
@@ -128,8 +130,27 @@ export function useObjectives() {
       setObjectives((prev) =>
         prev.map((obj) => {
           if (obj.id !== objectiveId) return obj;
-          const newLogs = [...obj.progressLogs, log];
-          const newCurrentValue = value;
+          
+          // Remove log existente para o mesmo mês/ano se houver
+          const filteredLogs = obj.progressLogs.filter(
+            (l) => !(l.month === month && l.year === year)
+          );
+          const newLogs = [...filteredLogs, log];
+          
+          // O currentValue é a soma de todos os valores mensais para quantity
+          // Ou o último valor para financial/percentage
+          let newCurrentValue: number;
+          if (obj.valueType === "quantity") {
+            newCurrentValue = newLogs.reduce((sum, l) => sum + l.value, 0);
+          } else {
+            // Para financial e percentage, pega o valor mais recente
+            const sortedLogs = [...newLogs].sort((a, b) => {
+              if (a.year !== b.year) return b.year - a.year;
+              return b.month - a.month;
+            });
+            newCurrentValue = sortedLogs[0]?.value || 0;
+          }
+          
           const newStatus = calculateStatus(newCurrentValue, obj.targetValue, obj.deadline);
           return {
             ...obj,
@@ -144,6 +165,47 @@ export function useObjectives() {
     },
     [setObjectives]
   );
+
+  const updateProgressLog = useCallback(
+    (objectiveId: string, month: number, year: number, value: number, description: string) => {
+      setObjectives((prev) =>
+        prev.map((obj) => {
+          if (obj.id !== objectiveId) return obj;
+          
+          const updatedLogs = obj.progressLogs.map((log) => {
+            if (log.month === month && log.year === year) {
+              return { ...log, value, description, date: new Date().toISOString().split("T")[0] };
+            }
+            return log;
+          });
+          
+          let newCurrentValue: number;
+          if (obj.valueType === "quantity") {
+            newCurrentValue = updatedLogs.reduce((sum, l) => sum + l.value, 0);
+          } else {
+            const sortedLogs = [...updatedLogs].sort((a, b) => {
+              if (a.year !== b.year) return b.year - a.year;
+              return b.month - a.month;
+            });
+            newCurrentValue = sortedLogs[0]?.value || 0;
+          }
+          
+          const newStatus = calculateStatus(newCurrentValue, obj.targetValue, obj.deadline);
+          return {
+            ...obj,
+            progressLogs: updatedLogs,
+            currentValue: newCurrentValue,
+            status: newStatus,
+          };
+        })
+      );
+    },
+    [setObjectives]
+  );
+
+  const getMonthlyProgress = useCallback((objective: Objective, month: number, year: number) => {
+    return objective.progressLogs.find((log) => log.month === month && log.year === year);
+  }, []);
 
   const getProgress = useCallback((objective: Objective) => {
     return Math.round((objective.currentValue / objective.targetValue) * 100);
@@ -163,6 +225,8 @@ export function useObjectives() {
     updateObjective,
     deleteObjective,
     addProgressLog,
+    updateProgressLog,
+    getMonthlyProgress,
     getProgress,
     getStats,
   };

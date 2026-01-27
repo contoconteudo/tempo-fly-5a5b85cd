@@ -3,9 +3,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Objective, ObjectiveValueType } from "@/types";
-import { ProgressLogForm } from "./ProgressLogForm";
+import { MonthlyProgressGrid } from "./MonthlyProgressGrid";
 import { ObjectiveForm } from "./ObjectiveForm";
-import { Plus, Pencil, Trash2, TrendingUp, Target, Briefcase, Users, Clock } from "lucide-react";
+import { Pencil, Trash2, TrendingUp, Target, Briefcase, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -22,7 +22,8 @@ interface ObjectiveDetailProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   objective: Objective | null;
-  onAddProgress: (objectiveId: string, value: number, description: string) => void;
+  onAddProgress: (objectiveId: string, month: number, year: number, value: number, description: string) => void;
+  onUpdateProgress: (objectiveId: string, month: number, year: number, value: number, description: string) => void;
   onUpdate: (id: string, data: Partial<Objective>) => void;
   onDelete: (id: string) => void;
 }
@@ -50,10 +51,10 @@ export function ObjectiveDetail({
   onOpenChange, 
   objective, 
   onAddProgress, 
+  onUpdateProgress,
   onUpdate,
   onDelete 
 }: ObjectiveDetailProps) {
-  const [showProgressForm, setShowProgressForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
 
@@ -105,7 +106,7 @@ export function ObjectiveDetail({
             {/* Progress */}
             <div className="p-4 rounded-lg bg-muted/50">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-foreground">Progresso</span>
+                <span className="text-sm font-medium text-foreground">Progresso Total</span>
                 <span className="text-lg font-bold text-primary">{progress}%</span>
               </div>
               <div className="h-3 rounded-full bg-muted overflow-hidden mb-2">
@@ -126,15 +127,9 @@ export function ObjectiveDetail({
 
             {/* Actions */}
             <div className="flex gap-2">
-              <Button 
-                onClick={() => setShowProgressForm(true)} 
-                className="flex-1 gradient-primary text-primary-foreground gap-1.5"
-              >
-                <Plus className="h-4 w-4" />
-                Registrar Progresso
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => setShowEditForm(true)}>
-                <Pencil className="h-4 w-4" />
+              <Button variant="outline" className="flex-1" onClick={() => setShowEditForm(true)}>
+                <Pencil className="h-4 w-4 mr-1.5" />
+                Editar Objetivo
               </Button>
               <Button 
                 variant="outline" 
@@ -146,44 +141,19 @@ export function ObjectiveDetail({
               </Button>
             </div>
 
-            {/* Progress Logs */}
-            <div>
-              <h4 className="text-sm font-semibold text-foreground mb-3">Histórico de Progresso</h4>
-              
-              {objective.progressLogs.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p className="text-sm">Nenhum registro de progresso ainda.</p>
-                  <p className="text-xs mt-1">Clique em "Registrar Progresso" para adicionar.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {[...objective.progressLogs].reverse().map((log) => (
-                    <div key={log.id} className="p-3 rounded-lg border border-border bg-card">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(log.date).toLocaleDateString('pt-BR')}
-                        </span>
-                        <span className="text-sm font-semibold text-primary">
-                          {formatValue(log.value)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-foreground">{log.description}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Monthly Progress Grid */}
+            <MonthlyProgressGrid
+              objective={objective}
+              onAddProgress={(month, year, value, description) => 
+                onAddProgress(objective.id, month, year, value, description)
+              }
+              onUpdateProgress={(month, year, value, description) => 
+                onUpdateProgress(objective.id, month, year, value, description)
+              }
+            />
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Progress Log Form */}
-      <ProgressLogForm
-        open={showProgressForm}
-        onOpenChange={setShowProgressForm}
-        objective={objective}
-        onSubmit={(value, description) => onAddProgress(objective.id, value, description)}
-      />
 
       {/* Edit Form */}
       <ObjectiveForm
