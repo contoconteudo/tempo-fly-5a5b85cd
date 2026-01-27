@@ -4,29 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-
-interface Client {
-  id: string;
-  company: string;
-  contact: string;
-  email: string;
-  phone: string;
-  segment: string;
-  package: string;
-  monthlyValue: number;
-  status: "active" | "inactive" | "churn";
-  nps: number;
-  ltv: number;
-  startDate: string;
-}
-
-const clients: Client[] = [
-  { id: "1", company: "Tech Solutions", contact: "Lucas Pereira", email: "lucas@tech.com", phone: "(11) 99999-1234", segment: "Tecnologia", package: "Completão", monthlyValue: 5500, status: "active", nps: 9, ltv: 33000, startDate: "2025-07-15" },
-  { id: "2", company: "Clínica Saúde+", contact: "Dr. Marcos Silva", email: "marcos@clinica.com", phone: "(11) 98888-5678", segment: "Saúde", package: "Start", monthlyValue: 3500, status: "active", nps: 8, ltv: 21000, startDate: "2025-08-01" },
-  { id: "3", company: "E-commerce Fashion", contact: "Ana Costa", email: "ana@fashion.com", phone: "(11) 97777-9012", segment: "Varejo", package: "Completão", monthlyValue: 5500, status: "active", nps: 10, ltv: 44000, startDate: "2025-05-20" },
-  { id: "4", company: "Escritório Advocacia", contact: "Dr. Roberto Alves", email: "roberto@adv.com", phone: "(11) 96666-3456", segment: "Serviços", package: "PF/Básico", monthlyValue: 1500, status: "active", nps: 7, ltv: 12000, startDate: "2025-09-10" },
-  { id: "5", company: "Startup Innovation", contact: "Carla Mendes", email: "carla@startup.com", phone: "(11) 95555-7890", segment: "Tecnologia", package: "Start", monthlyValue: 3500, status: "inactive", nps: 6, ltv: 10500, startDate: "2025-10-05" },
-];
+import { useClients } from "@/hooks/useClients";
 
 const statusConfig = {
   active: { label: "Ativo", class: "bg-success/10 text-success border-success/20" },
@@ -49,10 +27,17 @@ function NPSBadge({ score }: { score: number }) {
   );
 }
 
+// Calculate LTV based on months since start date
+function calculateLTV(monthlyValue: number, startDate: string): number {
+  const start = new Date(startDate);
+  const now = new Date();
+  const months = Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+  return monthlyValue * months;
+}
+
 export default function Clientes() {
-  const activeClients = clients.filter(c => c.status === "active").length;
-  const totalMRR = clients.filter(c => c.status === "active").reduce((sum, c) => sum + c.monthlyValue, 0);
-  const avgNPS = Math.round(clients.reduce((sum, c) => sum + c.nps, 0) / clients.length * 10) / 10;
+  const { clients, getStats } = useClients();
+  const stats = getStats();
 
   return (
     <AppLayout title="Clientes" subtitle="Gestão de carteira de clientes">
@@ -60,19 +45,19 @@ export default function Clientes() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="stat-card">
           <p className="stat-label">Clientes Ativos</p>
-          <p className="stat-value">{activeClients}</p>
+          <p className="stat-value">{stats.activeCount}</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">MRR Total</p>
-          <p className="stat-value">R$ {totalMRR.toLocaleString('pt-BR')}</p>
+          <p className="stat-value">R$ {stats.totalMRR.toLocaleString('pt-BR')}</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Ticket Médio</p>
-          <p className="stat-value">R$ {Math.round(totalMRR / activeClients).toLocaleString('pt-BR')}</p>
+          <p className="stat-value">R$ {stats.avgTicket.toLocaleString('pt-BR')}</p>
         </div>
         <div className="stat-card">
           <p className="stat-label">NPS Médio</p>
-          <p className="stat-value text-success">{avgNPS}</p>
+          <p className="stat-value text-success">{stats.avgNPS}</p>
         </div>
       </div>
 
@@ -147,7 +132,7 @@ export default function Clientes() {
                   <NPSBadge score={client.nps} />
                 </td>
                 <td className="p-4">
-                  <p className="text-sm font-medium text-muted-foreground">R$ {client.ltv.toLocaleString('pt-BR')}</p>
+                  <p className="text-sm font-medium text-muted-foreground">R$ {calculateLTV(client.monthlyValue, client.startDate).toLocaleString('pt-BR')}</p>
                 </td>
                 <td className="p-4 text-right">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

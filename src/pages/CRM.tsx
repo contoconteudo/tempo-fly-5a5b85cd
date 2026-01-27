@@ -11,7 +11,7 @@ import { Lead, LeadStage } from "@/types";
 const stageConfig: Record<LeadStage, { name: string; color: string }> = {
   new: { name: "Novo", color: "bg-muted-foreground" },
   contact: { name: "Contato Realizado", color: "bg-primary" },
-  meeting_scheduled: { name: "Agendou Reunião", color: "bg-info" },
+  meeting_scheduled: { name: "Agendou Reunião", color: "bg-primary/70" },
   meeting_done: { name: "Reunião Feita", color: "bg-accent" },
   proposal: { name: "Proposta Enviada", color: "bg-warning" },
   followup: { name: "Follow Up", color: "bg-orange-500" },

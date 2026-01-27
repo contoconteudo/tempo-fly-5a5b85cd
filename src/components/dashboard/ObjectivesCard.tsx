@@ -98,7 +98,11 @@ export function ObjectivesCard() {
 
       <a 
         href="/estrategia"
-        className="mt-4 w-full text-center text-sm font-medium text-primary hover:text-primary/80 transition-colors block"
+        onClick={(e) => {
+          e.preventDefault();
+          window.location.href = "/estrategia";
+        }}
+        className="mt-4 w-full text-center text-sm font-medium text-primary hover:text-primary/80 transition-colors block cursor-pointer"
       >
         Ver planejamento completo →
       </a>
