@@ -234,7 +234,7 @@ export default function Clientes() {
               <th className="text-left text-xs font-semibold text-muted-foreground p-4">Pacote</th>
               <th className="text-left text-xs font-semibold text-muted-foreground p-4">Valor/Mês</th>
               <th className="text-left text-xs font-semibold text-muted-foreground p-4">Status</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground p-4">NPS</th>
+              <th className="text-left text-xs font-semibold text-muted-foreground p-4">Último NPS</th>
               <th className="text-left text-xs font-semibold text-muted-foreground p-4">LTV</th>
               <th className="text-right text-xs font-semibold text-muted-foreground p-4">Ações</th>
             </tr>
