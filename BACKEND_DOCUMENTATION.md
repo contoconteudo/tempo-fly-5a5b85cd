@@ -1,6 +1,6 @@
 # Conto Management System (CMS) - Documentação para Integração Backend
 
-> Última atualização: Janeiro 2026
+> Última atualização: 27 de Janeiro de 2026
 
 ---
 
