@@ -2,6 +2,9 @@
 export type ObjectiveValueType = "financial" | "quantity" | "percentage";
 export type ObjectiveStatus = "on_track" | "at_risk" | "behind";
 
+// Fontes de dados para metas comerciais automáticas
+export type CommercialDataSource = "crm" | "clients";
+
 export interface ProgressLog {
   id: string;
   month: number; // 1-12
@@ -22,6 +25,9 @@ export interface Objective {
   status: ObjectiveStatus;
   createdAt: string;
   progressLogs: ProgressLog[];
+  // Campos para metas comerciais automáticas
+  isCommercial: boolean;
+  dataSources: CommercialDataSource[];
 }
 
 // Tipos para Leads (CRM)

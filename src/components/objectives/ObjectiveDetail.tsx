@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Objective, ObjectiveValueType } from "@/types";
+import { Objective, ObjectiveValueType, CommercialDataSource } from "@/types";
 import { MonthlyProgressGrid } from "./MonthlyProgressGrid";
 import { ObjectiveForm } from "./ObjectiveForm";
-import { Pencil, Trash2, TrendingUp, Target, Briefcase, Clock } from "lucide-react";
+import { Pencil, Trash2, TrendingUp, Target, Briefcase, Clock, Database, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -44,6 +44,11 @@ const valueTypeConfig: Record<ObjectiveValueType, { prefix: string; suffix: stri
   financial: { prefix: "R$ ", suffix: "" },
   quantity: { prefix: "", suffix: "" },
   percentage: { prefix: "", suffix: "%" },
+};
+
+const dataSourceLabels: Record<CommercialDataSource, { label: string; icon: typeof TrendingUp }> = {
+  crm: { label: "CRM", icon: TrendingUp },
+  clients: { label: "Clientes", icon: Users },
 };
 
 export function ObjectiveDetail({ 
@@ -95,13 +100,43 @@ export function ObjectiveDetail({
 
           <div className="space-y-6">
             {/* Status & Deadline */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Badge className={status.class}>{status.label}</Badge>
+              {objective.isCommercial && (
+                <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 gap-1">
+                  <Database className="h-3 w-3" />
+                  Automática
+                </Badge>
+              )}
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 Prazo: {new Date(objective.deadline).toLocaleDateString('pt-BR')}
               </div>
             </div>
+
+            {/* Commercial Data Sources Info */}
+            {objective.isCommercial && objective.dataSources.length > 0 && (
+              <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+                <p className="text-xs font-medium text-primary mb-2 flex items-center gap-1.5">
+                  <Database className="h-3.5 w-3.5" />
+                  Fontes de dados
+                </p>
+                <div className="flex gap-2">
+                  {objective.dataSources.map((source) => {
+                    const SourceIcon = dataSourceLabels[source].icon;
+                    return (
+                      <Badge key={source} variant="secondary" className="gap-1">
+                        <SourceIcon className="h-3 w-3" />
+                        {dataSourceLabels[source].label}
+                      </Badge>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  O valor atual é calculado automaticamente a partir dos dados selecionados.
+                </p>
+              </div>
+            )}
 
             {/* Progress */}
             <div className="p-4 rounded-lg bg-muted/50">
@@ -141,16 +176,18 @@ export function ObjectiveDetail({
               </Button>
             </div>
 
-            {/* Monthly Progress Grid */}
-            <MonthlyProgressGrid
-              objective={objective}
-              onAddProgress={(month, year, value, description) => 
-                onAddProgress(objective.id, month, year, value, description)
-              }
-              onUpdateProgress={(month, year, value, description) => 
-                onUpdateProgress(objective.id, month, year, value, description)
-              }
-            />
+            {/* Monthly Progress Grid - only for non-commercial objectives */}
+            {!objective.isCommercial && (
+              <MonthlyProgressGrid
+                objective={objective}
+                onAddProgress={(month, year, value, description) => 
+                  onAddProgress(objective.id, month, year, value, description)
+                }
+                onUpdateProgress={(month, year, value, description) => 
+                  onUpdateProgress(objective.id, month, year, value, description)
+                }
+              />
+            )}
           </div>
         </SheetContent>
       </Sheet>

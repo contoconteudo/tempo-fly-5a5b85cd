@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Target, TrendingUp, Calendar, Briefcase, Plus, ChevronRight } from "lucide-react";
+import { Target, TrendingUp, Calendar, Briefcase, Plus, ChevronRight, Database, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useObjectives } from "@/hooks/useObjectives";
 import { ObjectiveForm } from "@/components/objectives/ObjectiveForm";
 import { ObjectiveDetail } from "@/components/objectives/ObjectiveDetail";
-import { Objective, ObjectiveValueType } from "@/types";
+import { Objective, ObjectiveValueType, CommercialDataSource } from "@/types";
+
+const dataSourceIcons: Record<CommercialDataSource, typeof TrendingUp> = {
+  crm: TrendingUp,
+  clients: Users,
+};
 
 const typeIcons: Record<ObjectiveValueType, typeof TrendingUp> = {
   financial: TrendingUp,
@@ -169,11 +175,24 @@ export default function Estrategia() {
                     </div>
 
                     {/* Current vs Target */}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                       <span>Atual: {formatValue(obj.currentValue, obj.valueType)}</span>
                       <span>/</span>
                       <span className="font-medium text-foreground">Meta: {formatValue(obj.targetValue, obj.valueType)}</span>
-                      {obj.progressLogs.length > 0 && (
+                      {obj.isCommercial && obj.dataSources.length > 0 && (
+                        <>
+                          <span className="mx-1">•</span>
+                          <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 gap-1 bg-primary/5 text-primary border-primary/20">
+                            <Database className="h-3 w-3" />
+                            Auto
+                            {obj.dataSources.map((source) => {
+                              const SourceIcon = dataSourceIcons[source];
+                              return <SourceIcon key={source} className="h-3 w-3" />;
+                            })}
+                          </Badge>
+                        </>
+                      )}
+                      {!obj.isCommercial && obj.progressLogs.length > 0 && (
                         <>
                           <span className="mx-2">•</span>
                           <span>{obj.progressLogs.length} registro(s) de progresso</span>

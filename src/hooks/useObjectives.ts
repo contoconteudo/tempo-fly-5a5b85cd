@@ -1,6 +1,8 @@
 import { useLocalStorage } from "./useLocalStorage";
-import { Objective, ProgressLog, ObjectiveValueType, ObjectiveStatus } from "@/types";
-import { useCallback } from "react";
+import { Objective, ProgressLog, ObjectiveValueType, ObjectiveStatus, CommercialDataSource } from "@/types";
+import { useCallback, useMemo } from "react";
+import { useLeads } from "./useLeads";
+import { useClients } from "./useClients";
 
 const STORAGE_KEY = "conto-objectives";
 
@@ -20,6 +22,8 @@ const initialObjectives: Objective[] = [
       { id: "log1", month: 1, year: 2026, date: "2026-01-15", value: 32000, description: "Fechamento de janeiro" },
       { id: "log2", month: 1, year: 2026, date: "2026-01-25", value: 36000, description: "Novo cliente Tech Solutions" },
     ],
+    isCommercial: false,
+    dataSources: [],
   },
   {
     id: "2",
@@ -36,6 +40,8 @@ const initialObjectives: Objective[] = [
       { id: "log4", month: 1, year: 2026, date: "2026-01-18", value: 2, description: "Cliente Fashion Store" },
       { id: "log5", month: 1, year: 2026, date: "2026-01-22", value: 3, description: "Cliente Clínica Premium" },
     ],
+    isCommercial: false,
+    dataSources: [],
   },
   {
     id: "3",
@@ -48,6 +54,8 @@ const initialObjectives: Objective[] = [
     status: "at_risk",
     createdAt: "2026-01-01",
     progressLogs: [],
+    isCommercial: false,
+    dataSources: [],
   },
   {
     id: "4",
@@ -60,6 +68,22 @@ const initialObjectives: Objective[] = [
     status: "behind",
     createdAt: "2026-01-01",
     progressLogs: [],
+    isCommercial: false,
+    dataSources: [],
+  },
+  {
+    id: "5",
+    name: "Meta de Faturamento Comercial",
+    description: "Faturamento total de novas vendas e clientes ativos",
+    valueType: "financial",
+    targetValue: 100000,
+    currentValue: 0, // Será calculado automaticamente
+    deadline: "2026-12-31",
+    status: "behind",
+    createdAt: "2026-01-01",
+    progressLogs: [],
+    isCommercial: true,
+    dataSources: ["crm", "clients"],
   },
 ];
 
@@ -78,21 +102,67 @@ function calculateStatus(currentValue: number, targetValue: number, deadline: st
 
 export function useObjectives() {
   const [objectives, setObjectives] = useLocalStorage<Objective[]>(STORAGE_KEY, initialObjectives);
+  const { leads } = useLeads();
+  const { clients } = useClients();
+
+  // Calcula valor automático para metas comerciais
+  const calculateCommercialValue = useCallback(
+    (dataSources: CommercialDataSource[], valueType: ObjectiveValueType): number => {
+      let value = 0;
+
+      if (dataSources.includes("crm")) {
+        const wonLeads = leads.filter((l) => l.stage === "won");
+        if (valueType === "financial") {
+          value += wonLeads.reduce((sum, l) => sum + l.value, 0);
+        } else if (valueType === "quantity") {
+          value += wonLeads.length;
+        }
+      }
+
+      if (dataSources.includes("clients")) {
+        const activeClients = clients.filter((c) => c.status === "active");
+        if (valueType === "financial") {
+          value += activeClients.reduce((sum, c) => sum + c.monthlyValue, 0);
+        } else if (valueType === "quantity") {
+          value += activeClients.length;
+        }
+      }
+
+      return value;
+    },
+    [leads, clients]
+  );
+
+  // Objetivos com valores comerciais calculados automaticamente
+  const objectivesWithCommercialValues = useMemo(() => {
+    return objectives.map((obj) => {
+      if (obj.isCommercial && obj.dataSources.length > 0) {
+        const calculatedValue = calculateCommercialValue(obj.dataSources, obj.valueType);
+        const status = calculateStatus(calculatedValue, obj.targetValue, obj.deadline);
+        return { ...obj, currentValue: calculatedValue, status };
+      }
+      return obj;
+    });
+  }, [objectives, calculateCommercialValue]);
 
   const addObjective = useCallback(
     (data: Omit<Objective, "id" | "createdAt" | "progressLogs" | "currentValue" | "status">) => {
+      const initialValue = data.isCommercial && data.dataSources.length > 0
+        ? calculateCommercialValue(data.dataSources, data.valueType)
+        : 0;
+      
       const newObjective: Objective = {
         ...data,
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString().split("T")[0],
-        currentValue: 0,
-        status: "behind",
+        currentValue: initialValue,
+        status: calculateStatus(initialValue, data.targetValue, data.deadline),
         progressLogs: [],
       };
       setObjectives((prev) => [...prev, newObjective]);
       return newObjective;
     },
-    [setObjectives]
+    [setObjectives, calculateCommercialValue]
   );
 
   const updateObjective = useCallback(
@@ -212,15 +282,15 @@ export function useObjectives() {
   }, []);
 
   const getStats = useCallback(() => {
-    const total = objectives.length;
-    const onTrack = objectives.filter((o) => o.status === "on_track").length;
-    const atRisk = objectives.filter((o) => o.status === "at_risk").length;
-    const behind = objectives.filter((o) => o.status === "behind").length;
+    const total = objectivesWithCommercialValues.length;
+    const onTrack = objectivesWithCommercialValues.filter((o) => o.status === "on_track").length;
+    const atRisk = objectivesWithCommercialValues.filter((o) => o.status === "at_risk").length;
+    const behind = objectivesWithCommercialValues.filter((o) => o.status === "behind").length;
     return { total, onTrack, atRisk, behind };
-  }, [objectives]);
+  }, [objectivesWithCommercialValues]);
 
   return {
-    objectives,
+    objectives: objectivesWithCommercialValues,
     addObjective,
     updateObjective,
     deleteObjective,
