@@ -207,20 +207,25 @@ export function ObjectiveForm({ open, onOpenChange, onSubmit, objective, mode }:
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-muted-foreground/50"
                       }`}
-                      onClick={() => handleDataSourceToggle(key)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDataSourceToggle(key);
+                      }}
                     >
                       <Checkbox
                         id={`source-${key}`}
                         checked={dataSources.includes(key)}
                         onCheckedChange={() => handleDataSourceToggle(key)}
                         className="mt-0.5"
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <Icon className="h-4 w-4 text-primary" />
-                          <Label htmlFor={`source-${key}`} className="text-sm font-medium cursor-pointer">
+                          <span className="text-sm font-medium">
                             {label}
-                          </Label>
+                          </span>
                         </div>
                         <p className="text-xs text-muted-foreground">{description}</p>
                       </div>
