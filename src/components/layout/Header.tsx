@@ -1,6 +1,7 @@
-import { Bell, Search, Plus } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NotificationsPopover } from "./NotificationsPopover";
 
 interface HeaderProps {
   title: string;
@@ -26,12 +27,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           />
         </div>
 
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5 text-muted-foreground" />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-            3
-          </span>
-        </Button>
+        <NotificationsPopover />
 
         <Button size="sm" className="gradient-primary text-primary-foreground gap-1.5">
           <Plus className="h-4 w-4" />

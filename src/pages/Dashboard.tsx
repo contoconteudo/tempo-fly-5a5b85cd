@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Target,
   Handshake,
+  Star,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -27,7 +28,7 @@ export default function Dashboard() {
   return (
     <AppLayout title="Dashboard" subtitle="Visão geral das metas e operação comercial">
       {/* KPI Cards - Focados em Metas e CRM */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <StatCard
           title="Leads em Negociação"
           value={leadStats.inNegotiation.toString()}
@@ -67,6 +68,16 @@ export default function Dashboard() {
           }}
           icon={<TrendingUp className="h-5 w-5" />}
           iconClassName="bg-primary/10 text-primary"
+        />
+        <StatCard
+          title="NPS Médio"
+          value={clientStats.avgNPS.toString()}
+          trend={{ 
+            value: clientStats.avgNPS >= 8 ? "Excelente" : clientStats.avgNPS >= 6 ? "Bom" : "Precisa melhorar", 
+            isPositive: clientStats.avgNPS >= 7 
+          }}
+          icon={<Star className="h-5 w-5" />}
+          iconClassName="bg-accent/10 text-accent-foreground"
         />
       </div>
 
