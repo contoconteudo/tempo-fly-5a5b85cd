@@ -15,24 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const stageConfig: Record<LeadStage, { name: string; color: string }> = {
-  new: { name: "Novo", color: "bg-muted-foreground" },
-  contact: { name: "Contato Realizado", color: "bg-primary" },
-  meeting_scheduled: { name: "Agendou Reunião", color: "bg-primary/70" },
-  meeting_done: { name: "Reunião Feita", color: "bg-accent" },
-  proposal: { name: "Proposta Enviada", color: "bg-warning" },
-  followup: { name: "Follow Up", color: "bg-orange-500" },
-  negotiation: { name: "Negociação", color: "bg-success" },
-  won: { name: "Ganho", color: "bg-success" },
-  lost: { name: "Perdido", color: "bg-destructive" },
-};
-
-const temperatureLabels: Record<LeadTemperature, string> = {
-  hot: "Quente",
-  warm: "Morno",
-  cold: "Frio",
-};
+import { LEAD_STAGES, LEAD_TEMPERATURES, PIPELINE_STAGES } from "@/lib/constants";
 
 const TemperatureIcon = ({ temp }: { temp: "hot" | "warm" | "cold" }) => {
   const config = {
@@ -181,7 +164,7 @@ export default function CRM() {
       const lead = leads.find(l => l.id === draggedLeadId);
       if (lead && lead.stage !== stage) {
         moveLeadToStage(draggedLeadId, stage);
-        toast.success(`Lead movido para ${stageConfig[stage].name}`, {
+        toast.success(`Lead movido para ${LEAD_STAGES[stage].name}`, {
           description: `${lead.name} foi movido com sucesso.`,
         });
       }
@@ -191,9 +174,6 @@ export default function CRM() {
   };
 
   const stats = getPipelineStats();
-  
-  // Pipeline stages
-  const pipelineStages: LeadStage[] = ["new", "contact", "meeting_scheduled", "meeting_done", "proposal", "followup", "negotiation", "won", "lost"];
 
   // Filter leads by stage with additional filters
   const getFilteredLeadsByStage = (stage: LeadStage) => {
@@ -283,8 +263,8 @@ export default function CRM() {
 
       {/* Kanban Board */}
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {pipelineStages.map((stageKey) => {
-          const config = stageConfig[stageKey];
+        {PIPELINE_STAGES.map((stageKey) => {
+          const config = LEAD_STAGES[stageKey];
           const stageLeads = getFilteredLeadsByStage(stageKey);
           const stageTotal = stageLeads.reduce((sum, lead) => sum + lead.value, 0);
           

@@ -9,6 +9,7 @@ import { Client, NPSRecord } from "@/types";
 import { Star, Building2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getLatestNPS } from "@/hooks/useClients";
+import { MONTHS, getNPSColor } from "@/lib/constants";
 
 interface NPSQuickRegisterProps {
   open: boolean;
@@ -16,11 +17,6 @@ interface NPSQuickRegisterProps {
   clients: Client[];
   onAddNPS: (clientId: string, record: Omit<NPSRecord, "id">) => void;
 }
-
-const monthNames = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-];
 
 function NPSInput({ 
   value, 
@@ -109,7 +105,7 @@ export function NPSQuickRegister({ open, onOpenChange, clients, onAddNPS }: NPSQ
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {monthNames.map((name, i) => (
+                {MONTHS.map((name, i) => (
                   <SelectItem key={i} value={(i + 1).toString()}>{name}</SelectItem>
                 ))}
               </SelectContent>
@@ -187,6 +183,7 @@ export function NPSQuickRegister({ open, onOpenChange, clients, onAddNPS }: NPSQ
                       value={npsNotes[client.id] || ""}
                       onChange={(e) => setNpsNotes((prev) => ({ ...prev, [client.id]: e.target.value }))}
                       className="text-sm h-8"
+                      maxLength={1000}
                     />
                   </div>
                 </div>

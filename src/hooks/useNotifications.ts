@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useLeads } from "./useLeads";
 import { useClients } from "./useClients";
 import { useObjectives } from "./useObjectives";
+import { AUTOMATION_CONFIG, NPS_CONFIG } from "@/lib/constants";
 
 export interface AppNotification {
   id: string;
@@ -39,14 +40,14 @@ export function useNotifications() {
       const daysSinceChange = Math.floor(
         (Date.now() - new Date(lead.stageChangedAt).getTime()) / (1000 * 60 * 60 * 24)
       );
-      return daysSinceChange > 7;
+      return daysSinceChange > AUTOMATION_CONFIG.STALE_NEGOTIATION_DAYS;
     });
     if (staleNegotiations.length > 0) {
       alerts.push({
         id: "stale-negotiations",
         type: "warning",
         title: "Negociações Paradas",
-        message: `${staleNegotiations.length} lead(s) em negociação há mais de 7 dias.`,
+        message: `${staleNegotiations.length} lead(s) em negociação há mais de ${AUTOMATION_CONFIG.STALE_NEGOTIATION_DAYS} dias.`,
         category: "leads",
       });
     }
@@ -68,18 +69,18 @@ export function useNotifications() {
     // Check for clients with low NPS (latest score)
     const lowNpsClients = clients.filter((client) => {
       if (client.status !== "active" || client.npsHistory.length === 0) return false;
-      const latestNPS = client.npsHistory.sort((a, b) => {
+      const latestNPS = [...client.npsHistory].sort((a, b) => {
         if (a.year !== b.year) return b.year - a.year;
         return b.month - a.month;
       })[0];
-      return latestNPS.score <= 6;
+      return latestNPS.score < NPS_CONFIG.PASSIVE_MIN;
     });
     if (lowNpsClients.length > 0) {
       alerts.push({
         id: "low-nps",
         type: "error",
         title: "NPS Crítico",
-        message: `${lowNpsClients.length} cliente(s) ativo(s) com NPS ≤ 6. Risco de churn!`,
+        message: `${lowNpsClients.length} cliente(s) ativo(s) com NPS < ${NPS_CONFIG.PASSIVE_MIN}. Risco de churn!`,
         category: "clients",
       });
     }
@@ -110,19 +111,19 @@ export function useNotifications() {
       });
     }
 
-    // Check objectives deadline approaching (within 30 days)
+    // Check objectives deadline approaching
     const upcomingDeadlines = objectives.filter((obj) => {
       const daysToDeadline = Math.floor(
         (new Date(obj.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
-      return daysToDeadline > 0 && daysToDeadline <= 30 && obj.currentValue < obj.targetValue;
+      return daysToDeadline > 0 && daysToDeadline <= AUTOMATION_CONFIG.DEADLINE_WARNING_DAYS && obj.currentValue < obj.targetValue;
     });
     if (upcomingDeadlines.length > 0) {
       alerts.push({
         id: "deadline-approaching",
         type: "info",
         title: "Prazos Próximos",
-        message: `${upcomingDeadlines.length} objetivo(s) com prazo em até 30 dias.`,
+        message: `${upcomingDeadlines.length} objetivo(s) com prazo em até ${AUTOMATION_CONFIG.DEADLINE_WARNING_DAYS} dias.`,
         category: "objectives",
       });
     }

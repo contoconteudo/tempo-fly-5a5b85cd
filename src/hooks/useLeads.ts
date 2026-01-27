@@ -1,8 +1,7 @@
 import { useLocalStorage } from "./useLocalStorage";
-import { Lead, LeadStage, LeadTemperature } from "@/types";
+import { Lead, LeadStage } from "@/types";
 import { useCallback, useEffect } from "react";
-
-const STORAGE_KEY = "conto-leads";
+import { STORAGE_KEYS, AUTOMATION_CONFIG } from "@/lib/constants";
 
 const initialLeads: Lead[] = [
   { id: "1", name: "Maria Silva", company: "Tech Startup", email: "maria@tech.com", phone: "(11) 99999-1111", value: 3500, temperature: "hot", origin: "Tráfego Pago", stage: "new", lastContact: "2026-01-26", notes: "", createdAt: "2026-01-20", stageChangedAt: "2026-01-20" },
@@ -16,7 +15,7 @@ const initialLeads: Lead[] = [
 ];
 
 export function useLeads() {
-  const [leads, setLeads] = useLocalStorage<Lead[]>(STORAGE_KEY, initialLeads);
+  const [leads, setLeads] = useLocalStorage<Lead[]>(STORAGE_KEYS.LEADS, initialLeads);
 
   const addLead = useCallback(
     (data: Omit<Lead, "id" | "createdAt" | "stageChangedAt">) => {
@@ -89,18 +88,18 @@ export function useLeads() {
     };
   }, [leads]);
 
-  // Automação: mover leads de "proposal" para "followup" após 24h
+  // Automação: mover leads de "proposal" para "followup" após período configurado
   useEffect(() => {
     const checkAndMoveLeads = () => {
       const now = new Date().getTime();
-      const twentyFourHours = 24 * 60 * 60 * 1000;
+      const thresholdMs = AUTOMATION_CONFIG.PROPOSAL_TO_FOLLOWUP_HOURS * 60 * 60 * 1000;
 
       setLeads((prevLeads) => {
         let changed = false;
         const updatedLeads = prevLeads.map((lead) => {
           if (lead.stage === "proposal") {
             const stageTime = new Date(lead.stageChangedAt).getTime();
-            if (now - stageTime >= twentyFourHours) {
+            if (now - stageTime >= thresholdMs) {
               changed = true;
               return { 
                 ...lead, 
@@ -118,8 +117,8 @@ export function useLeads() {
     // Verificar imediatamente ao carregar
     checkAndMoveLeads();
 
-    // Verificar a cada minuto
-    const interval = setInterval(checkAndMoveLeads, 60 * 1000);
+    // Verificar no intervalo configurado
+    const interval = setInterval(checkAndMoveLeads, AUTOMATION_CONFIG.AUTOMATION_CHECK_INTERVAL);
 
     return () => clearInterval(interval);
   }, [setLeads]);

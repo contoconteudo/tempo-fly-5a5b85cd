@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Lead, LeadStage } from "@/types";
 import { LeadForm } from "./LeadForm";
-import { Pencil, Trash2, Phone, Mail, Building2, Clock, DollarSign, Flame, Thermometer, Snowflake, ArrowRight } from "lucide-react";
+import { Pencil, Trash2, Phone, Mail, Building2, Clock, DollarSign, Flame, Thermometer, Snowflake } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { LEAD_STAGES, LEAD_TEMPERATURES } from "@/lib/constants";
 
 interface LeadDetailProps {
   open: boolean;
@@ -27,22 +28,10 @@ interface LeadDetailProps {
   onMoveToStage: (id: string, stage: LeadStage) => void;
 }
 
-const stageConfig: Record<LeadStage, { label: string; color: string }> = {
-  new: { label: "Novo", color: "bg-muted-foreground" },
-  contact: { label: "Contato Realizado", color: "bg-primary" },
-  meeting_scheduled: { label: "Agendou Reunião", color: "bg-info" },
-  meeting_done: { label: "Reunião Feita", color: "bg-accent" },
-  proposal: { label: "Proposta Enviada", color: "bg-warning" },
-  followup: { label: "Follow Up", color: "bg-orange-500" },
-  negotiation: { label: "Em Negociação", color: "bg-success" },
-  won: { label: "Ganho", color: "bg-success" },
-  lost: { label: "Perdido", color: "bg-destructive" },
-};
-
-const temperatureConfig = {
-  hot: { icon: Flame, label: "Quente", class: "text-destructive" },
-  warm: { icon: Thermometer, label: "Morno", class: "text-warning" },
-  cold: { icon: Snowflake, label: "Frio", class: "text-primary" },
+const temperatureIcons = {
+  hot: { icon: Flame, class: "text-destructive" },
+  warm: { icon: Thermometer, class: "text-warning" },
+  cold: { icon: Snowflake, class: "text-primary" },
 };
 
 export function LeadDetail({ open, onOpenChange, lead, onUpdate, onDelete, onMoveToStage }: LeadDetailProps) {
@@ -51,8 +40,8 @@ export function LeadDetail({ open, onOpenChange, lead, onUpdate, onDelete, onMov
 
   if (!lead) return null;
 
-  const stage = stageConfig[lead.stage];
-  const temp = temperatureConfig[lead.temperature];
+  const stage = LEAD_STAGES[lead.stage];
+  const temp = { ...LEAD_TEMPERATURES[lead.temperature], ...temperatureIcons[lead.temperature] };
   const TempIcon = temp.icon;
 
   const handleDelete = () => {
@@ -84,7 +73,7 @@ export function LeadDetail({ open, onOpenChange, lead, onUpdate, onDelete, onMov
             <div className="flex items-center gap-3">
               <Badge className="gap-1">
                 <div className={cn("h-2 w-2 rounded-full", stage.color)} />
-                {stage.label}
+                {stage.name}
               </Badge>
               <div className={cn("flex items-center gap-1 text-sm", temp.class)}>
                 <TempIcon className="h-4 w-4" />
@@ -162,14 +151,16 @@ export function LeadDetail({ open, onOpenChange, lead, onUpdate, onDelete, onMov
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(stageConfig).map(([key, config]) => (
-                    <SelectItem key={key} value={key}>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("h-2 w-2 rounded-full", config.color)} />
-                        {config.label}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {(Object.entries(LEAD_STAGES) as [LeadStage, { name: string; color: string }][]).map(
+                    ([key, config]) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          <div className={cn("h-2 w-2 rounded-full", config.color)} />
+                          {config.name}
+                        </div>
+                      </SelectItem>
+                    )
+                  )}
                 </SelectContent>
               </Select>
             </div>

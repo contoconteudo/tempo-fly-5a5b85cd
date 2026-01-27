@@ -1,8 +1,7 @@
 import { useLocalStorage } from "./useLocalStorage";
-import { Client, ClientStatus, NPSRecord } from "@/types";
+import { Client, NPSRecord } from "@/types";
 import { useCallback, useMemo } from "react";
-
-const STORAGE_KEY = "conto-clients";
+import { STORAGE_KEYS } from "@/lib/constants";
 
 const initialClients: Client[] = [
   { 
@@ -112,7 +111,7 @@ export function getLatestNPS(npsHistory: NPSRecord[]): number | null {
 }
 
 export function useClients() {
-  const [clients, setClients] = useLocalStorage<Client[]>(STORAGE_KEY, initialClients);
+  const [clients, setClients] = useLocalStorage<Client[]>(STORAGE_KEYS.CLIENTS, initialClients);
 
   const addClient = useCallback(
     (data: Omit<Client, "id">) => {
@@ -225,7 +224,5 @@ export function useClients() {
     addNPSRecord,
     deleteNPSRecord,
     getStats,
-    calculateClientNPS,
-    getLatestNPS,
   };
 }

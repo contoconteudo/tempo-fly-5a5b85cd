@@ -7,6 +7,7 @@ import { Client, NPSRecord } from "@/types";
 import { Building2, Mail, Phone, Calendar, Package, TrendingUp, Star, Trash2, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { calculateClientNPS, getLatestNPS } from "@/hooks/useClients";
+import { CLIENT_STATUSES, MONTHS, getNPSColor } from "@/lib/constants";
 
 interface ClientDetailProps {
   open: boolean;
@@ -17,28 +18,14 @@ interface ClientDetailProps {
   onDeleteNPSRecord: (recordId: string) => void;
 }
 
-const statusConfig = {
-  active: { label: "Ativo", class: "bg-success/10 text-success border-success/20" },
-  inactive: { label: "Inativo", class: "bg-warning/10 text-warning border-warning/20" },
-  churn: { label: "Churn", class: "bg-destructive/10 text-destructive border-destructive/20" },
-};
-
-const monthNames = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-];
-
 function NPSScoreBadge({ score }: { score: number }) {
-  const getColor = () => {
-    if (score >= 9) return "text-success bg-success/10";
-    if (score >= 7) return "text-warning bg-warning/10";
-    return "text-destructive bg-destructive/10";
-  };
+  const colorClass = getNPSColor(score);
+  const bgClass = score >= 9 ? "bg-success/10" : score >= 7 ? "bg-warning/10" : "bg-destructive/10";
 
   return (
-    <div className={cn("flex items-center gap-1 px-2 py-1 rounded-md", getColor())}>
-      <Star className="h-3.5 w-3.5 fill-current" />
-      <span className="text-sm font-semibold">{score}</span>
+    <div className={cn("flex items-center gap-1 px-2 py-1 rounded-md", bgClass)}>
+      <Star className={cn("h-3.5 w-3.5 fill-current", colorClass)} />
+      <span className={cn("text-sm font-semibold", colorClass)}>{score}</span>
     </div>
   );
 }
@@ -56,6 +43,7 @@ export function ClientDetail({ open, onOpenChange, client, onEdit, onDelete, onD
   const avgNPS = calculateClientNPS(client.npsHistory);
   const latestNPS = getLatestNPS(client.npsHistory);
   const ltv = calculateLTV(client.monthlyValue, client.startDate);
+  const statusConfig = CLIENT_STATUSES[client.status];
 
   // Sort NPS history by date (newest first)
   const sortedNPSHistory = [...client.npsHistory].sort((a, b) => {
@@ -77,8 +65,8 @@ export function ClientDetail({ open, onOpenChange, client, onEdit, onDelete, onD
                 <p className="text-sm text-muted-foreground">{client.segment}</p>
               </div>
             </div>
-            <Badge className={statusConfig[client.status].class}>
-              {statusConfig[client.status].label}
+            <Badge className={statusConfig.className}>
+              {statusConfig.label}
             </Badge>
           </div>
         </DialogHeader>
@@ -175,7 +163,7 @@ export function ClientDetail({ open, onOpenChange, client, onEdit, onDelete, onD
                         <NPSScoreBadge score={record.score} />
                         <div>
                           <p className="text-sm font-medium">
-                            {monthNames[record.month - 1]} {record.year}
+                            {MONTHS[record.month - 1]} {record.year}
                           </p>
                           {record.notes && (
                             <p className="text-xs text-muted-foreground">{record.notes}</p>

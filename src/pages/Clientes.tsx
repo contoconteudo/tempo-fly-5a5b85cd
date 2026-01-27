@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Search, Filter, Plus, Building2, Mail, Phone, MoreHorizontal, Star, X } from "lucide-react";
+import { Search, Plus, Building2, Mail, Phone, MoreHorizontal, Star, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,28 +14,19 @@ import { ClientForm } from "@/components/clients/ClientForm";
 import { ClientDetail } from "@/components/clients/ClientDetail";
 import { NPSQuickRegister } from "@/components/clients/NPSQuickRegister";
 import { toast } from "sonner";
-
-const statusConfig = {
-  active: { label: "Ativo", class: "bg-success/10 text-success border-success/20" },
-  inactive: { label: "Inativo", class: "bg-warning/10 text-warning border-warning/20" },
-  churn: { label: "Churn", class: "bg-destructive/10 text-destructive border-destructive/20" },
-};
+import { CLIENT_STATUSES, getNPSColor } from "@/lib/constants";
 
 function NPSBadge({ score }: { score: number | null }) {
   if (score === null) {
     return <span className="text-sm text-muted-foreground">-</span>;
   }
 
-  const getColor = () => {
-    if (score >= 9) return "text-success";
-    if (score >= 7) return "text-warning";
-    return "text-destructive";
-  };
+  const colorClass = getNPSColor(score);
 
   return (
     <div className="flex items-center gap-1">
-      <Star className={cn("h-3.5 w-3.5 fill-current", getColor())} />
-      <span className={cn("text-sm font-semibold", getColor())}>{score}</span>
+      <Star className={cn("h-3.5 w-3.5 fill-current", colorClass)} />
+      <span className={cn("text-sm font-semibold", colorClass)}>{score}</span>
     </div>
   );
 }
@@ -273,8 +264,8 @@ export default function Clientes() {
                     <p className="text-sm font-semibold text-foreground">R$ {client.monthlyValue.toLocaleString('pt-BR')}</p>
                   </td>
                   <td className="p-4">
-                    <Badge className={statusConfig[client.status].class}>
-                      {statusConfig[client.status].label}
+                    <Badge className={CLIENT_STATUSES[client.status].className}>
+                      {CLIENT_STATUSES[client.status].label}
                     </Badge>
                   </td>
                   <td className="p-4">

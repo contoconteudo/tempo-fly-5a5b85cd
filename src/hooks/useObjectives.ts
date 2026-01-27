@@ -3,8 +3,7 @@ import { Objective, ProgressLog, ObjectiveValueType, ObjectiveStatus, Commercial
 import { useCallback, useMemo } from "react";
 import { useLeads } from "./useLeads";
 import { useClients } from "./useClients";
-
-const STORAGE_KEY = "conto-objectives";
+import { STORAGE_KEYS } from "@/lib/constants";
 
 // Dados iniciais de exemplo
 const initialObjectives: Objective[] = [
@@ -91,8 +90,9 @@ function calculateStatus(currentValue: number, targetValue: number, deadline: st
   const progress = (currentValue / targetValue) * 100;
   const now = new Date();
   const deadlineDate = new Date(deadline);
-  const totalDays = (deadlineDate.getTime() - new Date("2026-01-01").getTime()) / (1000 * 60 * 60 * 24);
-  const daysElapsed = (now.getTime() - new Date("2026-01-01").getTime()) / (1000 * 60 * 60 * 24);
+  const startOfYear = new Date("2026-01-01");
+  const totalDays = (deadlineDate.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24);
+  const daysElapsed = (now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24);
   const expectedProgress = (daysElapsed / totalDays) * 100;
 
   if (progress >= expectedProgress - 10) return "on_track";
@@ -101,7 +101,7 @@ function calculateStatus(currentValue: number, targetValue: number, deadline: st
 }
 
 export function useObjectives() {
-  const [objectives, setObjectives] = useLocalStorage<Objective[]>(STORAGE_KEY, initialObjectives);
+  const [objectives, setObjectives] = useLocalStorage<Objective[]>(STORAGE_KEYS.OBJECTIVES, initialObjectives);
   const { leads } = useLeads();
   const { clients } = useClients();
 

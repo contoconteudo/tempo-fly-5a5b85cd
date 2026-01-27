@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Lead, LeadTemperature, LeadStage } from "@/types";
+import { leadSchema, LeadFormData } from "@/lib/validations";
+import { LEAD_STAGES, LEAD_TEMPERATURES, LEAD_ORIGINS } from "@/lib/constants";
 
 interface LeadFormProps {
   open: boolean;
@@ -16,74 +19,58 @@ interface LeadFormProps {
   defaultStage?: LeadStage;
 }
 
-const temperatureLabels: Record<LeadTemperature, string> = {
-  hot: "🔥 Quente",
-  warm: "🌡️ Morno",
-  cold: "❄️ Frio",
-};
-
-const stageLabels: Record<LeadStage, string> = {
-  new: "Novo",
-  contact: "Contato Realizado",
-  meeting_scheduled: "Agendou Reunião",
-  meeting_done: "Reunião Feita",
-  proposal: "Proposta Enviada",
-  followup: "Follow Up",
-  negotiation: "Em Negociação",
-  won: "Ganho",
-  lost: "Perdido",
-};
-
-const originOptions = [
-  "Tráfego Pago",
-  "Orgânico",
-  "Indicação",
-  "LinkedIn",
-  "Evento",
-  "Outbound",
-  "Site",
-  "Outro",
-];
-
 export function LeadForm({ open, onOpenChange, onSubmit, lead, mode, defaultStage = "new" }: LeadFormProps) {
-  const [name, setName] = useState(lead?.name || "");
-  const [company, setCompany] = useState(lead?.company || "");
-  const [email, setEmail] = useState(lead?.email || "");
-  const [phone, setPhone] = useState(lead?.phone || "");
-  const [value, setValue] = useState(lead?.value?.toString() || "");
-  const [temperature, setTemperature] = useState<LeadTemperature>(lead?.temperature || "warm");
-  const [origin, setOrigin] = useState(lead?.origin || "");
-  const [stage, setStage] = useState<LeadStage>(lead?.stage || defaultStage);
-  const [notes, setNotes] = useState(lead?.notes || "");
+  const { 
+    register, 
+    handleSubmit, 
+    formState: { errors }, 
+    setValue, 
+    watch,
+    reset 
+  } = useForm<LeadFormData>({
+    resolver: zodResolver(leadSchema),
+    defaultValues: lead ? {
+      name: lead.name,
+      company: lead.company,
+      email: lead.email,
+      phone: lead.phone,
+      value: lead.value,
+      temperature: lead.temperature,
+      origin: lead.origin,
+      stage: lead.stage,
+      notes: lead.notes,
+    } : {
+      name: "",
+      company: "",
+      email: "",
+      phone: "",
+      value: 0,
+      temperature: "warm",
+      origin: "",
+      stage: defaultStage,
+      notes: "",
+    },
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!name.trim() || !company.trim()) return;
+  const currentTemperature = watch("temperature");
+  const currentOrigin = watch("origin");
+  const currentStage = watch("stage");
 
+  const handleFormSubmit = (data: LeadFormData) => {
     onSubmit({
-      name: name.trim(),
-      company: company.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      value: parseFloat(value) || 0,
-      temperature,
-      origin,
-      stage,
+      name: data.name,
+      company: data.company,
+      email: data.email,
+      phone: data.phone,
+      value: data.value,
+      temperature: data.temperature,
+      origin: data.origin,
+      stage: data.stage,
       lastContact: new Date().toISOString().split("T")[0],
-      notes: notes.trim(),
+      notes: data.notes,
     });
 
-    // Reset form
-    setName("");
-    setCompany("");
-    setEmail("");
-    setPhone("");
-    setValue("");
-    setTemperature("warm");
-    setOrigin("");
-    setStage(defaultStage);
-    setNotes("");
+    reset();
     onOpenChange(false);
   };
 
@@ -96,27 +83,27 @@ export function LeadForm({ open, onOpenChange, onSubmit, lead, mode, defaultStag
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome do Contato *</Label>
               <Input
                 id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                {...register("name")}
                 placeholder="João Silva"
-                required
+                maxLength={100}
               />
+              {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="company">Empresa *</Label>
               <Input
                 id="company"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
+                {...register("company")}
                 placeholder="Tech Corp"
-                required
+                maxLength={100}
               />
+              {errors.company && <p className="text-xs text-destructive">{errors.company.message}</p>}
             </div>
           </div>
 
@@ -126,19 +113,21 @@ export function LeadForm({ open, onOpenChange, onSubmit, lead, mode, defaultStag
               <Input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...register("email")}
                 placeholder="joao@empresa.com"
+                maxLength={255}
               />
+              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Telefone</Label>
               <Input
                 id="phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                {...register("phone")}
                 placeholder="(11) 99999-9999"
+                maxLength={20}
               />
+              {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
             </div>
           </div>
 
@@ -150,23 +139,29 @@ export function LeadForm({ open, onOpenChange, onSubmit, lead, mode, defaultStag
                 <Input
                   id="value"
                   type="number"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
+                  {...register("value", { valueAsNumber: true })}
                   className="pl-10"
                   placeholder="5000"
+                  min={0}
                 />
               </div>
+              {errors.value && <p className="text-xs text-destructive">{errors.value.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="temperature">Temperatura</Label>
-              <Select value={temperature} onValueChange={(v: LeadTemperature) => setTemperature(v)}>
+              <Label>Temperatura</Label>
+              <Select 
+                value={currentTemperature} 
+                onValueChange={(v: LeadTemperature) => setValue("temperature", v)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(temperatureLabels).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
+                  {(Object.entries(LEAD_TEMPERATURES) as [LeadTemperature, { label: string; emoji: string }][]).map(
+                    ([key, { label, emoji }]) => (
+                      <SelectItem key={key} value={key}>{emoji} {label}</SelectItem>
+                    )
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -174,28 +169,33 @@ export function LeadForm({ open, onOpenChange, onSubmit, lead, mode, defaultStag
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="origin">Origem</Label>
-              <Select value={origin} onValueChange={setOrigin}>
+              <Label>Origem</Label>
+              <Select value={currentOrigin} onValueChange={(v) => setValue("origin", v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {originOptions.map((opt) => (
+                  {LEAD_ORIGINS.map((opt) => (
                     <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="stage">Estágio</Label>
-              <Select value={stage} onValueChange={(v: LeadStage) => setStage(v)}>
+              <Label>Estágio</Label>
+              <Select 
+                value={currentStage} 
+                onValueChange={(v: LeadStage) => setValue("stage", v)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(stageLabels).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
+                  {(Object.entries(LEAD_STAGES) as [LeadStage, { name: string }][]).map(
+                    ([key, { name }]) => (
+                      <SelectItem key={key} value={key}>{name}</SelectItem>
+                    )
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -205,11 +205,12 @@ export function LeadForm({ open, onOpenChange, onSubmit, lead, mode, defaultStag
             <Label htmlFor="notes">Observações</Label>
             <Textarea
               id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              {...register("notes")}
               placeholder="Informações adicionais sobre o lead..."
               rows={2}
+              maxLength={1000}
             />
+            {errors.notes && <p className="text-xs text-destructive">{errors.notes.message}</p>}
           </div>
 
           <DialogFooter>
