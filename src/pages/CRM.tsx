@@ -11,6 +11,8 @@ import { Lead, LeadStage } from "@/types";
 const stageConfig: Record<LeadStage, { name: string; color: string }> = {
   new: { name: "Novo", color: "bg-muted-foreground" },
   contact: { name: "Contato Realizado", color: "bg-primary" },
+  meeting_scheduled: { name: "Agendou Reunião", color: "bg-info" },
+  meeting_done: { name: "Reunião Feita", color: "bg-accent" },
   proposal: { name: "Proposta Enviada", color: "bg-warning" },
   negotiation: { name: "Negociação", color: "bg-success" },
   won: { name: "Ganho", color: "bg-success" },
@@ -152,7 +154,7 @@ export default function CRM() {
   const stats = getPipelineStats();
   
   // Show only active stages in the pipeline (exclude 'lost')
-  const pipelineStages: LeadStage[] = ["new", "contact", "proposal", "negotiation", "won"];
+  const pipelineStages: LeadStage[] = ["new", "contact", "meeting_scheduled", "meeting_done", "proposal", "negotiation", "won"];
 
   const handleAddClick = (stage: LeadStage) => {
     setCreateFormStage(stage);

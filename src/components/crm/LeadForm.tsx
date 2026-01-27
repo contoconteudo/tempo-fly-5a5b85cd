@@ -25,6 +25,8 @@ const temperatureLabels: Record<LeadTemperature, string> = {
 const stageLabels: Record<LeadStage, string> = {
   new: "Novo",
   contact: "Contato Realizado",
+  meeting_scheduled: "Agendou Reunião",
+  meeting_done: "Reunião Feita",
   proposal: "Proposta Enviada",
   negotiation: "Em Negociação",
   won: "Ganho",

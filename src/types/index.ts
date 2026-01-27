@@ -24,7 +24,7 @@ export interface Objective {
 
 // Tipos para Leads (CRM)
 export type LeadTemperature = "hot" | "warm" | "cold";
-export type LeadStage = "new" | "contact" | "proposal" | "negotiation" | "won" | "lost";
+export type LeadStage = "new" | "contact" | "meeting_scheduled" | "meeting_done" | "proposal" | "negotiation" | "won" | "lost";
 
 export interface Lead {
   id: string;

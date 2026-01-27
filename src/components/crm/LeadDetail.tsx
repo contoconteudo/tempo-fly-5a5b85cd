@@ -30,6 +30,8 @@ interface LeadDetailProps {
 const stageConfig: Record<LeadStage, { label: string; color: string }> = {
   new: { label: "Novo", color: "bg-muted-foreground" },
   contact: { label: "Contato Realizado", color: "bg-primary" },
+  meeting_scheduled: { label: "Agendou Reunião", color: "bg-info" },
+  meeting_done: { label: "Reunião Feita", color: "bg-accent" },
   proposal: { label: "Proposta Enviada", color: "bg-warning" },
   negotiation: { label: "Em Negociação", color: "bg-success" },
   won: { label: "Ganho", color: "bg-success" },
