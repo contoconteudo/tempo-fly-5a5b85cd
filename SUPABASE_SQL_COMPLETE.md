@@ -51,11 +51,36 @@ CREATE TYPE public.objective_status AS ENUM ('on_track', 'at_risk', 'behind');
 
 ---
 
-## 2️⃣ FUNÇÃO AUXILIAR (Security Definer)
+## 2️⃣ TABELA DE ROLES
 
 ```sql
 -- =============================================
--- PASSO 2: FUNÇÃO PARA VERIFICAR ROLE
+-- PASSO 2: TABELA USER_ROLES
+-- IMPORTANTE: Criar ANTES da função has_role
+-- =============================================
+
+CREATE TABLE public.user_roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role app_role NOT NULL DEFAULT 'user',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, role)
+);
+
+-- Índice
+CREATE INDEX idx_user_roles_user_id ON public.user_roles(user_id);
+
+-- RLS
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+```
+
+---
+
+## 3️⃣ FUNÇÃO AUXILIAR (Security Definer)
+
+```sql
+-- =============================================
+-- PASSO 3: FUNÇÃO PARA VERIFICAR ROLE
 -- Evita recursão em políticas RLS
 -- =============================================
 
@@ -71,15 +96,24 @@ AS $$
     WHERE user_id = _user_id AND role = _role
   )
 $$;
+
+-- Políticas de user_roles (agora que has_role existe)
+CREATE POLICY "Users can view own roles"
+  ON public.user_roles FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can manage all roles"
+  ON public.user_roles FOR ALL
+  USING (public.has_role(auth.uid(), 'admin'));
 ```
 
 ---
 
-## 3️⃣ TABELA DE PERFIS
+## 4️⃣ TABELA DE PERFIS
 
 ```sql
 -- =============================================
--- PASSO 3: TABELA PROFILES
+-- PASSO 4: TABELA PROFILES
 -- =============================================
 
 CREATE TABLE public.profiles (
@@ -128,39 +162,6 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-```
-
----
-
-## 4️⃣ TABELA DE ROLES
-
-```sql
--- =============================================
--- PASSO 4: TABELA USER_ROLES
--- =============================================
-
-CREATE TABLE public.user_roles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  role app_role NOT NULL DEFAULT 'user',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (user_id, role)
-);
-
--- Índice
-CREATE INDEX idx_user_roles_user_id ON public.user_roles(user_id);
-
--- RLS
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
-
--- Políticas
-CREATE POLICY "Users can view own roles"
-  ON public.user_roles FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Admins can manage all roles"
-  ON public.user_roles FOR ALL
-  USING (public.has_role(auth.uid(), 'admin'));
 ```
 
 ---
