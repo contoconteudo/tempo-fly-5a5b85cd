@@ -10,6 +10,7 @@ import { Lead, Client, Objective, NPSRecord } from "@/types";
 // ============================================
 
 export type AppRole = "admin" | "gestor" | "comercial" | "analista";
+export type ModulePermission = "dashboard" | "crm" | "clients" | "objectives" | "strategy" | "settings" | "admin";
 
 export interface MockUser {
   id: string;
@@ -17,9 +18,11 @@ export interface MockUser {
   password: string; // Apenas para mock - nunca faça isso em produção!
   full_name: string;
   role: AppRole;
+  modules: ModulePermission[]; // Módulos específicos que este usuário pode acessar
   created_at: string;
 }
 
+// Admin tem acesso a TUDO automaticamente, os demais só têm o que o admin liberar
 export const MOCK_USERS: MockUser[] = [
   {
     id: "user-admin-001",
@@ -27,6 +30,7 @@ export const MOCK_USERS: MockUser[] = [
     password: "admin123",
     full_name: "Administrador",
     role: "admin",
+    modules: ["dashboard", "strategy", "crm", "clients", "settings", "admin"], // Admin sempre tem tudo
     created_at: "2024-01-01T00:00:00Z",
   },
   {
@@ -35,6 +39,7 @@ export const MOCK_USERS: MockUser[] = [
     password: "gestor123",
     full_name: "Maria Gestora",
     role: "gestor",
+    modules: ["dashboard", "strategy", "crm", "clients"], // Liberado pelo admin
     created_at: "2024-01-15T00:00:00Z",
   },
   {
@@ -43,6 +48,7 @@ export const MOCK_USERS: MockUser[] = [
     password: "comercial123",
     full_name: "João Vendas",
     role: "comercial",
+    modules: ["dashboard", "crm", "clients"], // Liberado pelo admin
     created_at: "2024-02-01T00:00:00Z",
   },
   {
@@ -51,6 +57,7 @@ export const MOCK_USERS: MockUser[] = [
     password: "analista123",
     full_name: "Ana Analista",
     role: "analista",
+    modules: ["dashboard"], // Apenas dashboard liberado pelo admin
     created_at: "2024-02-15T00:00:00Z",
   },
   {
@@ -58,33 +65,34 @@ export const MOCK_USERS: MockUser[] = [
     email: "novo@conto.com.br",
     password: "novo123",
     full_name: "Usuário Novo",
-    role: "analista", // Usuários novos entram como analista por padrão
+    role: "analista",
+    modules: [], // Usuário novo sem nenhum acesso até admin liberar
     created_at: "2025-01-28T00:00:00Z",
   },
 ];
 
 // ============================================
-// PERMISSÕES POR ROLE
+// PERMISSÕES - Módulos disponíveis para seleção
 // ============================================
 
-export type ModulePermission = "dashboard" | "crm" | "clients" | "objectives" | "strategy" | "settings" | "admin";
+export const ALL_MODULES: { id: ModulePermission; label: string; description: string }[] = [
+  { id: "dashboard", label: "Dashboard", description: "Visão geral e métricas do sistema" },
+  { id: "strategy", label: "Estratégia", description: "Objetivos e metas estratégicas" },
+  { id: "crm", label: "CRM", description: "Gestão de leads e oportunidades" },
+  { id: "clients", label: "Clientes", description: "Gestão de clientes ativos" },
+  { id: "settings", label: "Configurações", description: "Configurações pessoais" },
+];
 
-export const MODULE_PERMISSIONS: Record<ModulePermission, AppRole[]> = {
-  dashboard: ["admin", "gestor", "comercial", "analista"],
-  crm: ["admin", "gestor", "comercial"],
-  clients: ["admin", "gestor", "comercial"],
-  objectives: ["admin", "gestor"],
-  strategy: ["admin", "gestor"],
-  settings: ["admin", "gestor", "comercial", "analista"],
-  admin: ["admin"],
-};
-
+// Permissões padrão sugeridas por role (usado como template ao criar usuário)
 export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModulePermission[]> = {
   admin: ["dashboard", "strategy", "crm", "clients", "settings", "admin"],
   gestor: ["dashboard", "strategy", "crm", "clients", "settings"],
   comercial: ["dashboard", "crm", "clients", "settings"],
   analista: ["dashboard", "settings"],
 };
+
+// Storage key para permissões de usuários
+export const USER_PERMISSIONS_KEY = "conto-user-permissions";
 
 // ============================================
 // LEADS MOCKADOS

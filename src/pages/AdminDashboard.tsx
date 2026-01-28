@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useState, useMemo } from "react";
-import { Shield, Edit2, Save, X, Users, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Shield, Edit2, Save, X, Users, AlertCircle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -32,30 +32,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useUserRole, type AppRole, type ModulePermission } from "@/hooks/useUserRole";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MOCK_USERS, DEFAULT_ROLE_PERMISSIONS } from "@/data/mockData";
-
-interface UserWithRole {
-  id: string;
-  email: string;
-  full_name: string;
-  role: AppRole;
-  created_at: string;
-  modules: ModulePermission[];
-}
+import { ALL_MODULES, DEFAULT_ROLE_PERMISSIONS, MockUser } from "@/data/mockData";
 
 const AVAILABLE_ROLES: { value: AppRole; label: string; description: string }[] = [
   { value: "admin", label: "Admin", description: "Acesso total ao sistema" },
-  { value: "gestor", label: "Gestor", description: "Gerencia estratégia, objetivos e equipe" },
-  { value: "comercial", label: "Comercial", description: "Acesso ao CRM e clientes" },
-  { value: "analista", label: "Analista", description: "Acesso básico ao dashboard" },
-];
-
-const AVAILABLE_MODULES: { id: ModulePermission; label: string; description: string }[] = [
-  { id: "dashboard", label: "Dashboard", description: "Visão geral do sistema" },
-  { id: "strategy", label: "Estratégia", description: "Objetivos e metas estratégicas" },
-  { id: "crm", label: "CRM", description: "Gestão de leads e oportunidades" },
-  { id: "clients", label: "Clientes", description: "Gestão de clientes ativos" },
-  { id: "settings", label: "Configurações", description: "Configurações pessoais" },
+  { value: "gestor", label: "Gestor", description: "Gerencia estratégia e equipe" },
+  { value: "comercial", label: "Comercial", description: "Foco em CRM e clientes" },
+  { value: "analista", label: "Analista", description: "Acesso restrito" },
 ];
 
 const getRoleBadgeStyle = (role: AppRole) => {
@@ -74,26 +57,20 @@ const getRoleBadgeStyle = (role: AppRole) => {
 };
 
 export default function AdminDashboard() {
-  const { isAdmin } = useUserRole();
+  const { isAdmin, getAllUsers, updateUserPermissions, updateUserRole } = useUserRole();
   
-  // Usar dados mockados diretamente
-  const users: UserWithRole[] = useMemo(() => {
-    return MOCK_USERS.map((user) => ({
-      id: user.id,
-      email: user.email,
-      full_name: user.full_name,
-      role: user.role,
-      created_at: user.created_at,
-      modules: DEFAULT_ROLE_PERMISSIONS[user.role],
-    }));
-  }, []);
-
-  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
+  const [users, setUsers] = useState<MockUser[]>([]);
+  const [editingUser, setEditingUser] = useState<MockUser | null>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole>("analista");
   const [selectedModules, setSelectedModules] = useState<ModulePermission[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const handleEditUser = (user: UserWithRole) => {
+  // Carregar usuários
+  useEffect(() => {
+    setUsers(getAllUsers());
+  }, [getAllUsers]);
+
+  const handleEditUser = (user: MockUser) => {
     setEditingUser(user);
     setSelectedRole(user.role);
     setSelectedModules(user.modules);
@@ -101,8 +78,10 @@ export default function AdminDashboard() {
 
   const handleRoleChange = (role: AppRole) => {
     setSelectedRole(role);
-    // Aplicar permissões padrão da role
-    setSelectedModules(DEFAULT_ROLE_PERMISSIONS[role] || []);
+    // Sugerir permissões padrão da role (exceto para admin)
+    if (role !== "admin") {
+      setSelectedModules(DEFAULT_ROLE_PERMISSIONS[role].filter(m => m !== "admin"));
+    }
   };
 
   const handleSaveUser = async () => {
@@ -110,11 +89,23 @@ export default function AdminDashboard() {
 
     setSaving(true);
     
-    // Simular salvamento (em produção, iria para o backend)
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Simular delay de rede
+    await new Promise((resolve) => setTimeout(resolve, 300));
     
-    toast.success("Permissões atualizadas com sucesso (modo demo)");
-    toast.info("Em produção, as alterações seriam salvas no banco de dados.");
+    // Salvar permissões
+    updateUserPermissions(editingUser.id, selectedModules);
+    updateUserRole(editingUser.id, selectedRole);
+    
+    // Atualizar lista local
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === editingUser.id
+          ? { ...u, role: selectedRole, modules: selectedModules }
+          : u
+      )
+    );
+    
+    toast.success(`Permissões de ${editingUser.full_name} atualizadas!`);
     
     setSaving(false);
     setEditingUser(null);
@@ -126,6 +117,14 @@ export default function AdminDashboard() {
         ? prev.filter((m) => m !== moduleId)
         : [...prev, moduleId]
     );
+  };
+
+  const selectAllModules = () => {
+    setSelectedModules(ALL_MODULES.map((m) => m.id));
+  };
+
+  const clearAllModules = () => {
+    setSelectedModules([]);
   };
 
   if (!isAdmin) {
@@ -149,10 +148,10 @@ export default function AdminDashboard() {
       <div className="space-y-6">
         {/* Info Card */}
         <Alert className="bg-primary/5 border-primary/20">
-          <Shield className="h-4 w-4" />
+          <Info className="h-4 w-4" />
           <AlertDescription>
-            <strong>Modo Demonstração:</strong> Os dados são mockados. Em produção, 
-            os usuários serão carregados do banco de dados e as alterações serão persistidas.
+            <strong>Como funciona:</strong> Administradores têm acesso total. 
+            Para outros usuários, você controla exatamente quais módulos eles podem acessar.
           </AlertDescription>
         </Alert>
 
@@ -173,7 +172,7 @@ export default function AdminDashboard() {
               <TableRow>
                 <TableHead>Usuário</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Módulos</TableHead>
+                <TableHead>Módulos Liberados</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -197,28 +196,40 @@ export default function AdminDashboard() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {user.modules.slice(0, 3).map((module) => (
-                        <Badge
-                          key={module}
-                          variant="secondary"
-                          className="text-xs"
-                        >
-                          {module}
-                        </Badge>
-                      ))}
-                      {user.modules.length > 3 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{user.modules.length - 3}
-                        </Badge>
-                      )}
-                    </div>
+                    {user.role === "admin" ? (
+                      <Badge variant="secondary" className="text-xs">
+                        Acesso Total
+                      </Badge>
+                    ) : user.modules.length === 0 ? (
+                      <span className="text-xs text-muted-foreground italic">
+                        Nenhum módulo liberado
+                      </span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {user.modules.slice(0, 3).map((module) => (
+                          <Badge
+                            key={module}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {ALL_MODULES.find((m) => m.id === module)?.label || module}
+                          </Badge>
+                        ))}
+                        {user.modules.length > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{user.modules.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEditUser(user)}
+                      disabled={user.role === "admin"}
+                      title={user.role === "admin" ? "Admins têm acesso total" : "Editar permissões"}
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
@@ -247,16 +258,11 @@ export default function AdminDashboard() {
                 <p className="text-sm text-muted-foreground">
                   {role.description}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {DEFAULT_ROLE_PERMISSIONS[role.value].map((module) => (
-                    <span
-                      key={module}
-                      className="text-xs text-muted-foreground/70"
-                    >
-                      {module}
-                    </span>
-                  ))}
-                </div>
+                {role.value === "admin" && (
+                  <p className="text-xs text-primary mt-2 font-medium">
+                    ✓ Acesso total automático
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -269,7 +275,7 @@ export default function AdminDashboard() {
           <DialogHeader>
             <DialogTitle>Editar Permissões</DialogTitle>
             <DialogDescription>
-              Configure a role e os módulos que o usuário pode acessar
+              Selecione quais módulos este usuário pode acessar
             </DialogDescription>
           </DialogHeader>
 
@@ -292,7 +298,7 @@ export default function AdminDashboard() {
                     <SelectValue placeholder="Selecione uma role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {AVAILABLE_ROLES.map((role) => (
+                    {AVAILABLE_ROLES.filter((r) => r.value !== "admin").map((role) => (
                       <SelectItem key={role.value} value={role.value}>
                         <div className="flex items-center gap-2">
                           <Badge
@@ -312,23 +318,52 @@ export default function AdminDashboard() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  A role define o tipo de usuário, mas o acesso real depende dos módulos selecionados abaixo.
+                </p>
               </div>
 
               {/* Module Permissions */}
               <div className="space-y-3">
-                <Label>Módulos Permitidos</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Módulos Permitidos</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={selectAllModules}
+                      className="text-xs h-7"
+                    >
+                      Selecionar todos
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearAllModules}
+                      className="text-xs h-7"
+                    >
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
                 <div className="grid gap-2">
-                  {AVAILABLE_MODULES.map((module) => (
+                  {ALL_MODULES.map((module) => (
                     <div
                       key={module.id}
-                      className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-accent/5 transition-colors"
+                      className={cn(
+                        "flex items-start space-x-3 p-3 rounded-lg border transition-colors cursor-pointer",
+                        selectedModules.includes(module.id)
+                          ? "bg-primary/5 border-primary/30"
+                          : "hover:bg-accent/5"
+                      )}
+                      onClick={() => toggleModule(module.id)}
                     >
                       <Checkbox
                         id={module.id}
                         checked={selectedModules.includes(module.id)}
                         onCheckedChange={() => toggleModule(module.id)}
                       />
-                      <div className="space-y-0.5">
+                      <div className="space-y-0.5 flex-1">
                         <Label
                           htmlFor={module.id}
                           className="font-medium cursor-pointer"
@@ -342,9 +377,15 @@ export default function AdminDashboard() {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  * Alterações serão salvas no banco de dados em produção
-                </p>
+                
+                {selectedModules.length === 0 && (
+                  <Alert variant="destructive" className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Sem módulos selecionados, o usuário não poderá acessar nada no sistema.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </div>
           )}
@@ -364,7 +405,7 @@ export default function AdminDashboard() {
               ) : (
                 <Save className="h-4 w-4 mr-1" />
               )}
-              Salvar
+              Salvar Permissões
             </Button>
           </DialogFooter>
         </DialogContent>
