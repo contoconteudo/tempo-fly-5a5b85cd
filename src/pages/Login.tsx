@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,18 @@ import { Loader2 } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, isAuthenticated, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+
+  // Redirecionar automaticamente quando autenticado
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate("/", { replace: true });
+    }
+  }, [authLoading, isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,18 +30,26 @@ export default function Login() {
       if (isSignUp) {
         await signUp(email, password);
         toast.success("Conta criada com sucesso!");
-        navigate("/");
+        // O useEffect cuidará do redirecionamento quando isAuthenticated mudar
       } else {
         await signIn(email, password);
         toast.success("Login realizado com sucesso!");
-        navigate("/");
+        // O useEffect cuidará do redirecionamento quando isAuthenticated mudar
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao processar solicitação");
-    } finally {
       setIsLoading(false);
     }
   };
+
+  // Mostrar loading enquanto verifica autenticação inicial
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 safe-area-top safe-area-bottom">
