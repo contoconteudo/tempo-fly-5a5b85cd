@@ -1,5 +1,10 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+/**
+ * Contexto para gerenciar a empresa/espaço selecionado.
+ * Usa useUserSession para evitar queries duplicadas.
+ */
+
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useUserSession } from "@/hooks/useUserSession";
 
 export type Company = string;
 
@@ -28,128 +33,44 @@ interface CompanyProviderProps {
 }
 
 export function CompanyProvider({ children }: CompanyProviderProps) {
-  const [currentCompany, setCurrentCompanyState] = useState<Company>("");
-  const [allowedCompanies, setAllowedCompanies] = useState<Company[]>([]);
-  const [availableSpaces, setAvailableSpaces] = useState<Space[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const session = useUserSession();
+  const [currentCompany, setCurrentCompanyState] = useState<Company>(() => {
+    return localStorage.getItem(STORAGE_KEY) || "";
+  });
 
-  // Carregar espaços disponíveis do banco
-  const loadAvailableSpaces = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("spaces")
-        .select("*")
-        .order("created_at", { ascending: true });
+  // Mapear espaços disponíveis
+  const availableSpaces: Space[] = session.availableSpaces.map(s => ({
+    id: s.id,
+    label: s.label,
+    description: s.description || "",
+    color: s.color || "bg-primary",
+  }));
 
-      if (error) {
-        console.error("Erro ao carregar espaços:", error);
-        return [];
-      }
+  // Atualizar empresa selecionada quando dados carregarem
+  useEffect(() => {
+    if (session.isLoading || session.spacesLoading) return;
 
-      const spaces: Space[] = (data || []).map(s => ({
-        id: s.id,
-        label: s.label,
-        description: s.description || "",
-        color: s.color || "bg-primary",
-      }));
-
-      setAvailableSpaces(spaces);
-      return spaces;
-    } catch (error) {
-      console.error("Erro ao carregar espaços:", error);
-      return [];
-    }
-  }, []);
-
-  // Carregar permissões do usuário atual
-  const loadUserPermissions = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        setAllowedCompanies([]);
-        setIsAdmin(false);
-        setIsLoading(false);
-        return;
-      }
-
-      // Verificar se é admin
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      const userIsAdmin = roleData?.role === "admin";
-      setIsAdmin(userIsAdmin);
-
-      // Carregar espaços disponíveis
-      const spaces = await loadAvailableSpaces();
-      const spaceIds = spaces.map(s => s.id);
-
-      if (userIsAdmin) {
-        // Admin tem acesso a todos os espaços
-        setAllowedCompanies(spaceIds);
-      } else {
-        // Buscar permissões específicas
-        const { data: permData } = await supabase
-          .from("user_permissions")
-          .select("spaces")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (permData?.spaces) {
-          const validSpaces = permData.spaces.filter((s: string) => spaceIds.includes(s));
-          setAllowedCompanies(validSpaces);
-        } else {
-          setAllowedCompanies([]);
-        }
-      }
-
-      // Definir empresa atual
-      const savedCompany = localStorage.getItem(STORAGE_KEY);
-      if (savedCompany && spaceIds.includes(savedCompany)) {
+    const spaceIds = availableSpaces.map(s => s.id);
+    const savedCompany = localStorage.getItem(STORAGE_KEY);
+    
+    // Se a empresa salva é válida, mantém
+    if (savedCompany && spaceIds.includes(savedCompany)) {
+      if (currentCompany !== savedCompany) {
         setCurrentCompanyState(savedCompany);
-      } else if (spaceIds.length > 0) {
-        setCurrentCompanyState(spaceIds[0]);
-        localStorage.setItem(STORAGE_KEY, spaceIds[0]);
       }
-    } catch (error) {
-      console.error("Erro ao carregar permissões:", error);
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  }, [loadAvailableSpaces]);
-
-  // Carregar permissões na inicialização
-  useEffect(() => {
-    loadUserPermissions();
-  }, [loadUserPermissions]);
-
-  // Escutar evento de mudança de usuário (login/logout)
-  useEffect(() => {
-    const handleAuthChange = () => {
-      loadUserPermissions();
-    };
-
-    window.addEventListener("auth-user-changed", handleAuthChange);
-    return () => window.removeEventListener("auth-user-changed", handleAuthChange);
-  }, [loadUserPermissions]);
-
-  // Escutar evento de mudança de espaços
-  useEffect(() => {
-    const handleSpacesChange = () => {
-      loadAvailableSpaces();
-    };
-
-    window.addEventListener("spaces-changed", handleSpacesChange);
-    return () => window.removeEventListener("spaces-changed", handleSpacesChange);
-  }, [loadAvailableSpaces]);
+    
+    // Senão, seleciona a primeira disponível
+    if (spaceIds.length > 0 && !spaceIds.includes(currentCompany)) {
+      setCurrentCompanyState(spaceIds[0]);
+      localStorage.setItem(STORAGE_KEY, spaceIds[0]);
+    }
+  }, [session.isLoading, session.spacesLoading, availableSpaces, currentCompany]);
 
   const setCurrentCompany = (company: Company) => {
-    // Verificar se o usuário tem acesso a essa empresa
-    if (!isAdmin && !allowedCompanies.includes(company)) {
+    // Verificar se o usuário tem acesso
+    if (!session.isAdmin && !session.allowedSpaces.includes(company)) {
       console.warn(`Usuário não tem acesso ao espaço ${company}`);
       return;
     }
@@ -163,10 +84,10 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
       value={{
         currentCompany,
         setCurrentCompany,
-        allowedCompanies,
+        allowedCompanies: session.allowedSpaces,
         availableSpaces,
-        isAdmin,
-        isLoading,
+        isAdmin: session.isAdmin,
+        isLoading: session.isLoading || session.spacesLoading,
       }}
     >
       {children}

@@ -1,11 +1,11 @@
 /**
  * Hook para gerenciar espaços (empresas) do sistema.
- * Integrado com Supabase.
+ * Usa useUserSession para evitar queries duplicadas.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "./useAuth";
+import { useUserSession } from "./useUserSession";
 
 export interface Space {
   id: string;
@@ -39,43 +39,16 @@ const generateSpaceId = (name: string): string => {
 };
 
 export function useSpaces() {
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuth();
+  const session = useUserSession();
 
-  // Carregar espaços do banco
-  const loadSpaces = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("spaces")
-        .select("*")
-        .order("created_at", { ascending: true });
-
-      if (error) {
-        console.error("Erro ao carregar espaços:", error);
-        return;
-      }
-
-      const mappedSpaces: Space[] = (data || []).map(s => ({
-        id: s.id,
-        label: s.label,
-        description: s.description || "",
-        color: s.color || "bg-primary",
-        createdAt: s.created_at,
-      }));
-
-      setSpaces(mappedSpaces);
-    } catch (error) {
-      console.error("Erro ao carregar espaços:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Carregar espaços na inicialização
-  useEffect(() => {
-    loadSpaces();
-  }, [loadSpaces]);
+  // Mapear espaços do formato do banco para o formato do hook
+  const spaces: Space[] = session.availableSpaces.map(s => ({
+    id: s.id,
+    label: s.label,
+    description: s.description || "",
+    color: s.color || "bg-primary",
+    createdAt: s.created_at,
+  }));
 
   // Criar novo espaço
   const createSpace = useCallback(async (
@@ -83,7 +56,7 @@ export function useSpaces() {
     description: string, 
     color: string
   ): Promise<{ success: boolean; error?: string; space?: Space }> => {
-    if (!user?.id) {
+    if (!session.user?.id) {
       return { success: false, error: "Usuário não autenticado" };
     }
 
@@ -109,7 +82,6 @@ export function useSpaces() {
         label: label.trim(),
         description: description.trim() || `Espaço ${label.trim()}`,
         color,
-        created_by: user.id,
       })
       .select()
       .single();
@@ -127,11 +99,12 @@ export function useSpaces() {
       createdAt: data.created_at,
     };
 
-    setSpaces(prev => [...prev, newSpace]);
+    // Disparar evento para atualizar cache
     window.dispatchEvent(new CustomEvent("spaces-changed"));
+    await session.refreshSpaces();
     
     return { success: true, space: newSpace };
-  }, [user?.id, spaces]);
+  }, [session, spaces]);
 
   // Atualizar espaço existente
   const updateSpace = useCallback(async (
@@ -147,13 +120,11 @@ export function useSpaces() {
       return { success: false, error: error.message };
     }
 
-    setSpaces(prev => prev.map(s => 
-      s.id === id ? { ...s, ...updates } : s
-    ));
     window.dispatchEvent(new CustomEvent("spaces-changed"));
+    await session.refreshSpaces();
     
     return { success: true };
-  }, []);
+  }, [session]);
 
   // Excluir espaço
   const deleteSpace = useCallback(async (
@@ -172,11 +143,11 @@ export function useSpaces() {
       return { success: false, error: error.message };
     }
 
-    setSpaces(prev => prev.filter(s => s.id !== id));
     window.dispatchEvent(new CustomEvent("spaces-changed"));
+    await session.refreshSpaces();
     
     return { success: true };
-  }, [spaces.length]);
+  }, [session, spaces.length]);
 
   // Obter IDs de todos os espaços
   const getSpaceIds = useCallback((): string[] => {
@@ -185,12 +156,12 @@ export function useSpaces() {
 
   return {
     spaces,
-    isLoading,
+    isLoading: session.spacesLoading,
     createSpace,
     updateSpace,
     deleteSpace,
     getSpaceIds,
-    refreshSpaces: loadSpaces,
+    refreshSpaces: session.refreshSpaces,
     SPACE_COLORS,
   };
 }

@@ -1,9 +1,9 @@
 import { ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserRole, ModulePermission } from "@/hooks/useUserRole";
+import { useUserSession, ModulePermission } from "@/hooks/useUserSession";
 import { Loader2, ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -12,17 +12,14 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, requiredModule }: ProtectedRouteProps) {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading: authLoading, signOut } = useAuth();
-  const { canAccessModule, isLoading: roleLoading, isAdmin } = useUserRole();
-
-  const isLoading = authLoading || roleLoading;
+  const session = useUserSession();
 
   const handleLogout = async () => {
-    await signOut();
+    await supabase.auth.signOut();
     navigate("/login", { replace: true });
   };
 
-  if (isLoading) {
+  if (session.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -30,12 +27,12 @@ export function ProtectedRoute({ children, requiredModule }: ProtectedRouteProps
     );
   }
 
-  if (!isAuthenticated) {
+  if (!session.isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
   // Verificar permissão de módulo (se especificado)
-  if (requiredModule && !isAdmin && !canAccessModule(requiredModule)) {
+  if (requiredModule && !session.canAccessModule(requiredModule)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
         <div className="text-center max-w-md">

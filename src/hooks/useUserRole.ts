@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "./useAuth";
+/**
+ * Hook para verificar roles e permissões do usuário.
+ * Wrapper sobre useUserSession para compatibilidade com código existente.
+ */
+
+import { useCallback } from "react";
+import { useUserSession, AppRole, ModulePermission } from "./useUserSession";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = "admin" | "gestor" | "comercial" | "analista";
-export type ModulePermission = "dashboard" | "crm" | "clients" | "objectives" | "strategy" | "settings" | "admin";
+export type { AppRole, ModulePermission };
 export type CompanyAccess = string;
 
 export interface UserProfile {
@@ -33,153 +37,52 @@ interface UseUserRoleReturn {
 }
 
 export function useUserRole(): UseUserRoleReturn {
-  const { user, isLoading: authLoading } = useAuth();
-  const [role, setRole] = useState<AppRole | null>(null);
-  const [userModules, setUserModules] = useState<ModulePermission[]>([]);
-  const [userCompanies, setUserCompanies] = useState<CompanyAccess[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Carregar role e permissões do banco
-  const loadUserData = useCallback(async (userId: string) => {
-    try {
-      // Buscar role
-      const { data: roleData, error: roleError } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (roleError) {
-        console.error("Erro ao buscar role:", roleError);
-        setRole(null);
-      } else {
-        setRole(roleData?.role as AppRole | null);
-      }
-
-      // Se for admin, tem acesso total
-      if (roleData?.role === "admin") {
-        // Buscar todos os espaços disponíveis
-        const { data: spacesData } = await supabase
-          .from("spaces")
-          .select("id");
-        
-        const allModules: ModulePermission[] = ["dashboard", "strategy", "crm", "clients", "settings", "admin"];
-        setUserModules(allModules);
-        setUserCompanies(spacesData?.map(s => s.id) || []);
-      } else {
-        // Buscar permissões específicas
-        const { data: permData } = await supabase
-          .from("user_permissions")
-          .select("allowed_modules, allowed_spaces")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        if (permData) {
-          setUserModules((permData.allowed_modules || []) as ModulePermission[]);
-          setUserCompanies(permData.allowed_spaces || []);
-        } else {
-          setUserModules([]);
-          setUserCompanies([]);
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao carregar dados do usuário:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Carregar permissões quando user mudar
-  useEffect(() => {
-    if (authLoading) return;
-
-    if (!user?.id) {
-      setRole(null);
-      setUserModules([]);
-      setUserCompanies([]);
-      setIsLoading(false);
-      return;
-    }
-
-    loadUserData(user.id);
-  }, [user?.id, authLoading, loadUserData]);
-
-  // Escutar evento de mudança de auth
-  useEffect(() => {
-    const handleAuthChange = async (event: CustomEvent) => {
-      const newUser = event.detail;
-      if (newUser?.id) {
-        await loadUserData(newUser.id);
-      } else {
-        setRole(null);
-        setUserModules([]);
-        setUserCompanies([]);
-        setIsLoading(false);
-      }
-    };
-
-    window.addEventListener("auth-user-changed", handleAuthChange as EventListener);
-    return () => window.removeEventListener("auth-user-changed", handleAuthChange as EventListener);
-  }, [loadUserData]);
-
-  const hasRole = useCallback((checkRole: AppRole): boolean => {
-    return role === checkRole;
-  }, [role]);
-
-  const canAccessModule = useCallback((module: ModulePermission): boolean => {
-    if (!role) return false;
-    if (role === "admin") return true;
-    return userModules.includes(module);
-  }, [role, userModules]);
+  const session = useUserSession();
 
   const canAccessCompany = useCallback((company: CompanyAccess): boolean => {
-    if (!role) return false;
-    if (role === "admin") return true;
-    return userCompanies.includes(company);
-  }, [role, userCompanies]);
+    return session.canAccessSpace(company);
+  }, [session]);
 
   const getUserModules = useCallback((): ModulePermission[] => {
-    return userModules;
-  }, [userModules]);
+    return session.modules;
+  }, [session.modules]);
 
   const getUserCompanies = useCallback((): CompanyAccess[] => {
-    return userCompanies;
-  }, [userCompanies]);
+    return session.allowedSpaces;
+  }, [session.allowedSpaces]);
 
+  // Buscar todos os usuários (para admin)
   const getAllUsers = useCallback(async (): Promise<UserProfile[]> => {
     const { data: profiles, error } = await supabase
       .from("profiles")
-      .select(`
-        id,
-        email,
-        full_name
-      `);
+      .select("id, email, full_name");
 
     if (error) {
       console.error("Erro ao buscar usuários:", error);
       return [];
     }
 
-    // Buscar roles e permissões para cada usuário
+    // Buscar roles e permissões em paralelo para todos os usuários
     const usersWithRoles = await Promise.all(
       (profiles || []).map(async (profile) => {
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", profile.id)
-          .maybeSingle();
-
-        const { data: permData } = await supabase
-          .from("user_permissions")
-          .select("allowed_modules, allowed_spaces")
-          .eq("user_id", profile.id)
-          .maybeSingle();
+        const [roleResult, permResult] = await Promise.all([
+          supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", profile.id)
+            .maybeSingle(),
+          supabase
+            .from("user_permissions")
+            .select("allowed_modules, allowed_spaces")
+            .eq("user_id", profile.id)
+            .maybeSingle(),
+        ]);
 
         return {
           ...profile,
-          role: (roleData?.role as AppRole) || null,
-          modules: (permData?.allowed_modules || []) as ModulePermission[],
-          companies: permData?.allowed_spaces || [],
+          role: (roleResult.data?.role as AppRole) || null,
+          modules: (permResult.data?.allowed_modules || []) as ModulePermission[],
+          companies: permResult.data?.allowed_spaces || [],
         };
       })
     );
@@ -192,7 +95,6 @@ export function useUserRole(): UseUserRoleReturn {
     modules: ModulePermission[], 
     companies: CompanyAccess[]
   ) => {
-    // Verificar se já existe registro
     const { data: existing } = await supabase
       .from("user_permissions")
       .select("id")
@@ -200,27 +102,23 @@ export function useUserRole(): UseUserRoleReturn {
       .maybeSingle();
 
     if (existing) {
-      // Atualizar
       await supabase
         .from("user_permissions")
         .update({ allowed_modules: modules, allowed_spaces: companies, updated_at: new Date().toISOString() })
         .eq("user_id", userId);
     } else {
-      // Inserir
       await supabase
         .from("user_permissions")
         .insert({ user_id: userId, allowed_modules: modules, allowed_spaces: companies });
     }
 
-    // Se for o usuário atual, atualizar estado
-    if (user?.id === userId && role !== "admin") {
-      setUserModules(modules);
-      setUserCompanies(companies);
+    // Se for o usuário atual, invalidar cache
+    if (session.user?.id === userId) {
+      await session.refreshSession();
     }
-  }, [user?.id, role]);
+  }, [session]);
 
   const updateUserRole = useCallback(async (userId: string, newRole: AppRole) => {
-    // Verificar se já existe registro
     const { data: existing } = await supabase
       .from("user_roles")
       .select("id")
@@ -228,33 +126,31 @@ export function useUserRole(): UseUserRoleReturn {
       .maybeSingle();
 
     if (existing) {
-      // Atualizar
       await supabase
         .from("user_roles")
         .update({ role: newRole })
         .eq("user_id", userId);
     } else {
-      // Inserir
       await supabase
         .from("user_roles")
         .insert({ user_id: userId, role: newRole });
     }
 
-    // Se for o usuário atual, recarregar dados
-    if (user?.id === userId) {
-      await loadUserData(userId);
+    // Se for o usuário atual, invalidar cache
+    if (session.user?.id === userId) {
+      await session.refreshSession();
     }
-  }, [user?.id, loadUserData]);
+  }, [session]);
 
   return {
-    role,
-    isLoading: isLoading || authLoading,
-    isAdmin: role === "admin",
-    isGestor: role === "gestor",
-    isComercial: role === "comercial",
-    isAnalista: role === "analista",
-    hasRole,
-    canAccessModule,
+    role: session.role,
+    isLoading: session.isLoading,
+    isAdmin: session.isAdmin,
+    isGestor: session.role === "gestor",
+    isComercial: session.role === "comercial",
+    isAnalista: session.role === "analista",
+    hasRole: session.hasRole,
+    canAccessModule: session.canAccessModule,
     canAccessCompany,
     getUserModules,
     getUserCompanies,
