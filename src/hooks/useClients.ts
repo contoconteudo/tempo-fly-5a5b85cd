@@ -3,6 +3,7 @@ import { Client, NPSRecord, ClientStatus } from "@/types";
 import { useCallback, useMemo } from "react";
 import { STORAGE_KEYS } from "@/lib/constants";
 import { MOCK_CLIENTS } from "@/data/mockData";
+import { useCompany } from "@/contexts/CompanyContext";
 
 // Helper function to calculate average NPS from history
 export function calculateClientNPS(npsHistory: NPSRecord[]): number {
@@ -22,41 +23,49 @@ export function getLatestNPS(npsHistory: NPSRecord[]): number | null {
 }
 
 export function useClients() {
-  const [clients, setClients] = useLocalStorage<Client[]>(STORAGE_KEYS.CLIENTS, MOCK_CLIENTS);
+  const [allClients, setAllClients] = useLocalStorage<Client[]>(STORAGE_KEYS.CLIENTS, MOCK_CLIENTS);
+  const { currentCompany } = useCompany();
+
+  // Filtrar clientes pelo espaço atual
+  const clients = useMemo(() => {
+    return allClients.filter((client) => client.company_id === currentCompany);
+  }, [allClients, currentCompany]);
 
   const addClient = useCallback(
-    (data: Omit<Client, "id" | "project_id" | "user_id">) => {
+    (data: Omit<Client, "id" | "project_id" | "user_id" | "company_id" | "npsHistory">) => {
       const newClient: Client = {
         ...data,
         id: crypto.randomUUID(),
         project_id: "default",
         user_id: "current-user",
+        company_id: currentCompany,
+        npsHistory: [],
       };
-      setClients((prev) => [...prev, newClient]);
+      setAllClients((prev) => [...prev, newClient]);
       return newClient;
     },
-    [setClients]
+    [setAllClients, currentCompany]
   );
 
   const updateClient = useCallback(
-    (id: string, data: Partial<Omit<Client, "id" | "project_id" | "user_id">>) => {
-      setClients((prev) =>
+    (id: string, data: Partial<Omit<Client, "id" | "project_id" | "user_id" | "company_id">>) => {
+      setAllClients((prev) =>
         prev.map((client) => (client.id === id ? { ...client, ...data } : client))
       );
     },
-    [setClients]
+    [setAllClients]
   );
 
   const deleteClient = useCallback(
     (id: string) => {
-      setClients((prev) => prev.filter((client) => client.id !== id));
+      setAllClients((prev) => prev.filter((client) => client.id !== id));
     },
-    [setClients]
+    [setAllClients]
   );
 
   const addNPSRecord = useCallback(
     (clientId: string, record: Omit<NPSRecord, "id" | "client_id">) => {
-      setClients((prev) =>
+      setAllClients((prev) =>
         prev.map((client) => {
           if (client.id !== clientId) return client;
           
@@ -80,12 +89,12 @@ export function useClients() {
         })
       );
     },
-    [setClients]
+    [setAllClients]
   );
 
   const deleteNPSRecord = useCallback(
     (clientId: string, recordId: string) => {
-      setClients((prev) =>
+      setAllClients((prev) =>
         prev.map((client) => {
           if (client.id !== clientId) return client;
           return {
@@ -95,7 +104,7 @@ export function useClients() {
         })
       );
     },
-    [setClients]
+    [setAllClients]
   );
 
   const getStats = useCallback(() => {

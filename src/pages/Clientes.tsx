@@ -80,12 +80,12 @@ export default function Clientes() {
   const hasActiveFilters = statusFilter !== "all" || segmentFilter !== "all";
 
   // Handlers
-  const handleAddClient = (data: Omit<Client, "id" | "npsHistory">) => {
-    addClient({ ...data, npsHistory: [] });
+  const handleAddClient = (data: Omit<Client, "id" | "npsHistory" | "project_id" | "user_id" | "company_id">) => {
+    addClient(data);
     toast.success("Cliente criado com sucesso!");
   };
 
-  const handleUpdateClient = (data: Omit<Client, "id" | "npsHistory">) => {
+  const handleUpdateClient = (data: Omit<Client, "id" | "npsHistory" | "project_id" | "user_id" | "company_id">) => {
     if (!selectedClient) return;
     updateClient(selectedClient.id, data);
     toast.success("Cliente atualizado com sucesso!");

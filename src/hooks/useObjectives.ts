@@ -5,6 +5,7 @@ import { useLeads } from "./useLeads";
 import { useClients } from "./useClients";
 import { STORAGE_KEYS } from "@/lib/constants";
 import { MOCK_OBJECTIVES } from "@/data/mockData";
+import { useCompany } from "@/contexts/CompanyContext";
 
 function calculateStatus(currentValue: number, targetValue: number, deadline: string): ObjectiveStatus {
   const progress = (currentValue / targetValue) * 100;
@@ -21,9 +22,15 @@ function calculateStatus(currentValue: number, targetValue: number, deadline: st
 }
 
 export function useObjectives() {
-  const [objectives, setObjectives] = useLocalStorage<Objective[]>(STORAGE_KEYS.OBJECTIVES, MOCK_OBJECTIVES);
+  const [allObjectives, setAllObjectives] = useLocalStorage<Objective[]>(STORAGE_KEYS.OBJECTIVES, MOCK_OBJECTIVES);
   const { leads } = useLeads();
   const { clients } = useClients();
+  const { currentCompany } = useCompany();
+
+  // Filtrar objetivos pelo espaço atual
+  const objectives = useMemo(() => {
+    return allObjectives.filter((obj) => obj.company_id === currentCompany);
+  }, [allObjectives, currentCompany]);
 
   // Calcula valor automático para metas comerciais
   const calculateCommercialValue = useCallback(
@@ -66,7 +73,7 @@ export function useObjectives() {
   }, [objectives, calculateCommercialValue]);
 
   const addObjective = useCallback(
-    (data: Omit<Objective, "id" | "createdAt" | "progressLogs" | "currentValue" | "status" | "project_id" | "user_id">) => {
+    (data: Omit<Objective, "id" | "createdAt" | "progressLogs" | "currentValue" | "status" | "project_id" | "user_id" | "company_id">) => {
       const initialValue = data.isCommercial && data.dataSources.length > 0
         ? calculateCommercialValue(data.dataSources, data.valueType)
         : 0;
@@ -76,20 +83,21 @@ export function useObjectives() {
         id: crypto.randomUUID(),
         project_id: "default",
         user_id: "current-user",
+        company_id: currentCompany,
         createdAt: new Date().toISOString().split("T")[0],
         currentValue: initialValue,
         status: calculateStatus(initialValue, data.targetValue, data.deadline),
         progressLogs: [],
       };
-      setObjectives((prev) => [...prev, newObjective]);
+      setAllObjectives((prev) => [...prev, newObjective]);
       return newObjective;
     },
-    [setObjectives, calculateCommercialValue]
+    [setAllObjectives, calculateCommercialValue, currentCompany]
   );
 
   const updateObjective = useCallback(
-    (id: string, data: Partial<Omit<Objective, "id" | "createdAt" | "progressLogs" | "project_id" | "user_id">>) => {
-      setObjectives((prev) =>
+    (id: string, data: Partial<Omit<Objective, "id" | "createdAt" | "progressLogs" | "project_id" | "user_id" | "company_id">>) => {
+      setAllObjectives((prev) =>
         prev.map((obj) => {
           if (obj.id !== id) return obj;
           const updated = { ...obj, ...data };
@@ -98,14 +106,14 @@ export function useObjectives() {
         })
       );
     },
-    [setObjectives]
+    [setAllObjectives]
   );
 
   const deleteObjective = useCallback(
     (id: string) => {
-      setObjectives((prev) => prev.filter((obj) => obj.id !== id));
+      setAllObjectives((prev) => prev.filter((obj) => obj.id !== id));
     },
-    [setObjectives]
+    [setAllObjectives]
   );
 
   const addProgressLog = useCallback(
@@ -120,7 +128,7 @@ export function useObjectives() {
         description,
       };
 
-      setObjectives((prev) =>
+      setAllObjectives((prev) =>
         prev.map((obj) => {
           if (obj.id !== objectiveId) return obj;
           
@@ -156,12 +164,12 @@ export function useObjectives() {
 
       return log;
     },
-    [setObjectives]
+    [setAllObjectives]
   );
 
   const updateProgressLog = useCallback(
     (objectiveId: string, month: number, year: number, value: number, description: string) => {
-      setObjectives((prev) =>
+      setAllObjectives((prev) =>
         prev.map((obj) => {
           if (obj.id !== objectiveId) return obj;
           
@@ -193,12 +201,12 @@ export function useObjectives() {
         })
       );
     },
-    [setObjectives]
+    [setAllObjectives]
   );
 
   const deleteProgressLog = useCallback(
     (objectiveId: string, month: number, year: number) => {
-      setObjectives((prev) =>
+      setAllObjectives((prev) =>
         prev.map((obj) => {
           if (obj.id !== objectiveId) return obj;
           
@@ -227,7 +235,7 @@ export function useObjectives() {
         })
       );
     },
-    [setObjectives]
+    [setAllObjectives]
   );
 
   const getMonthlyProgress = useCallback((objective: Objective, month: number, year: number) => {

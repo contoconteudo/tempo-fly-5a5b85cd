@@ -26,6 +26,7 @@ export interface Lead {
   id: string;
   project_id: string;
   user_id: string;
+  company_id: string; // Espaço ao qual o lead pertence
   name: string;
   company: string;
   email: string;
@@ -44,6 +45,7 @@ export interface Client {
   id: string;
   project_id: string;
   user_id: string;
+  company_id: string; // Espaço ao qual o cliente pertence
   company: string;
   contact: string;
   email: string;
@@ -71,6 +73,7 @@ export interface Objective {
   id: string;
   project_id: string;
   user_id: string;
+  company_id: string; // Espaço ao qual o objetivo pertence
   name: string;
   description: string;
   valueType: ObjectiveValueType;
