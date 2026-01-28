@@ -40,22 +40,24 @@ const navigation: NavItem[] = [
   { name: "Admin", href: "/admin", icon: Shield, module: "admin" },
 ];
 
-const companyInfo: Record<Company, { name: string; gradient: string }> = {
-  conto: { 
-    name: "Conto", 
-    gradient: "bg-gradient-to-br from-primary to-primary/80" 
-  },
-  amplia: { 
-    name: "Amplia", 
-    gradient: "bg-gradient-to-br from-blue-600 to-blue-500" 
-  },
+// Helper para obter gradiente baseado na cor do espaço
+const getGradientFromColor = (color: string): string => {
+  if (color.includes('primary')) return "bg-gradient-to-br from-primary to-primary/80";
+  if (color.includes('blue')) return "bg-gradient-to-br from-blue-600 to-blue-500";
+  if (color.includes('green')) return "bg-gradient-to-br from-green-600 to-green-500";
+  if (color.includes('purple')) return "bg-gradient-to-br from-purple-600 to-purple-500";
+  if (color.includes('orange')) return "bg-gradient-to-br from-orange-600 to-orange-500";
+  if (color.includes('cyan')) return "bg-gradient-to-br from-cyan-600 to-cyan-500";
+  if (color.includes('rose')) return "bg-gradient-to-br from-rose-600 to-rose-500";
+  if (color.includes('amber')) return "bg-gradient-to-br from-amber-600 to-amber-500";
+  return "bg-gradient-to-br from-primary to-primary/80";
 };
 
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { currentCompany, setCurrentCompany, allowedCompanies, isAdmin: companyIsAdmin } = useCompany();
+  const { currentCompany, setCurrentCompany, allowedCompanies, availableSpaces, isAdmin: companyIsAdmin } = useCompany();
   const { role, canAccessModule, isLoading: roleLoading } = useUserRole();
 
   const handleSignOut = async () => {
@@ -72,18 +74,27 @@ export function Sidebar() {
     }
   };
 
+  // Obter informações do espaço atual
+  const currentSpace = availableSpaces.find(s => s.id === currentCompany);
+  const currentInfo = currentSpace 
+    ? { name: currentSpace.label, gradient: getGradientFromColor(currentSpace.color) }
+    : { name: "Espaço", gradient: "bg-gradient-to-br from-primary to-primary/80" };
+
   const handleCompanyChange = (company: Company) => {
     setCurrentCompany(company);
-    toast.success(`Alternado para ${companyInfo[company].name}`);
+    const space = availableSpaces.find(s => s.id === company);
+    toast.success(`Alternado para ${space?.label || company}`);
   };
 
   const userInitials = user?.email
     ? user.email.slice(0, 2).toUpperCase()
     : "??";
 
-  const currentInfo = companyInfo[currentCompany];
-  const availableCompanies = companyIsAdmin ? (["conto", "amplia"] as Company[]) : allowedCompanies;
-  const canSwitch = availableCompanies.length > 1;
+  // Filtrar espaços permitidos
+  const availableCompanySpaces = companyIsAdmin 
+    ? availableSpaces 
+    : availableSpaces.filter(s => allowedCompanies.includes(s.id));
+  const canSwitch = availableCompanySpaces.length > 1;
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border">
@@ -122,23 +133,23 @@ export function Sidebar() {
                 className="w-56 bg-popover border-border"
                 sideOffset={8}
               >
-                {availableCompanies.map((company) => (
+                {availableCompanySpaces.map((space) => (
                   <DropdownMenuItem
-                    key={company}
-                    onClick={() => handleCompanyChange(company)}
+                    key={space.id}
+                    onClick={() => handleCompanyChange(space.id)}
                     className="cursor-pointer flex items-center gap-3 py-3"
                   >
                     <div className={cn(
                       "flex h-8 w-8 items-center justify-center rounded-lg",
-                      companyInfo[company].gradient
+                      getGradientFromColor(space.color)
                     )}>
                       <Building2 className="h-4 w-4 text-white" />
                     </div>
                     <div className="flex flex-col flex-1">
-                      <span className="font-medium">{companyInfo[company].name}</span>
-                      <span className="text-xs text-muted-foreground">Project Management</span>
+                      <span className="font-medium">{space.label}</span>
+                      <span className="text-xs text-muted-foreground">{space.description}</span>
                     </div>
-                    {currentCompany === company && (
+                    {currentCompany === space.id && (
                       <Check className="h-4 w-4 text-primary flex-shrink-0" />
                     )}
                   </DropdownMenuItem>
