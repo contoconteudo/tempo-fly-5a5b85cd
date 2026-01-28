@@ -120,7 +120,10 @@ export function useUserSession() {
   const sessionQuery = useQuery({
     queryKey: QUERY_KEY,
     queryFn: async (): Promise<UserSession> => {
-      const { data: { user } } = await supabase.auth.getUser();
+      // getSession() é local e muito mais rápido que getUser() (que valida via rede).
+      // A segurança continua garantida pelas políticas do banco em todas as queries.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       
       if (!user) {
         return {
