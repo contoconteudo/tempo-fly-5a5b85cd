@@ -1,6 +1,6 @@
 /**
  * Hook para gerenciar espaços (empresas) do sistema.
- * Suporta tanto Supabase quanto localStorage (fallback).
+ * Integrado diretamente ao Supabase.
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -28,51 +28,6 @@ export const SPACE_COLORS = [
   { value: "#d97706", label: "Âmbar" },
 ];
 
-const SPACES_STORAGE_KEY = "conto-spaces";
-
-// Espaços padrão do sistema
-const DEFAULT_SPACES: Space[] = [
-  { 
-    id: "conto", 
-    label: "Conto", 
-    description: "Agência Conto", 
-    color: "#c4378f",
-    createdAt: "2024-01-01T00:00:00Z"
-  },
-  { 
-    id: "amplia", 
-    label: "Amplia", 
-    description: "Agência Amplia", 
-    color: "#2563eb",
-    createdAt: "2024-01-01T00:00:00Z"
-  },
-];
-
-// Função para obter espaços do localStorage
-const getStoredSpaces = (): Space[] => {
-  try {
-    const stored = localStorage.getItem(SPACES_STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    localStorage.setItem(SPACES_STORAGE_KEY, JSON.stringify(DEFAULT_SPACES));
-    return DEFAULT_SPACES;
-  } catch {
-    return DEFAULT_SPACES;
-  }
-};
-
-// Função para gerar ID único baseado no nome
-const generateSpaceId = (name: string): string => {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-};
-
 interface SpaceRow {
   id: string;
   label: string;
@@ -84,25 +39,50 @@ interface SpaceRow {
 
 export function useSpaces() {
   const { user } = useAuth();
-  const [spaces, setSpaces] = useState<Space[]>(getStoredSpaces);
+  const [spaces, setSpaces] = useState<Space[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Carregar espaços (Supabase ou localStorage)
+  // Verificar se é admin
+  const checkAdminRole = useCallback(async () => {
+    if (!user?.id) return false;
+    try {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return (data as any)?.role === "admin";
+    } catch {
+      return false;
+    }
+  }, [user?.id]);
+
+  // Carregar espaços do Supabase
   const fetchSpaces = useCallback(async () => {
     if (!user?.id) {
-      setSpaces(getStoredSpaces());
+      setSpaces([]);
       setIsLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await supabase
-        .from("spaces")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
+      const adminStatus = await checkAdminRole();
+      setIsAdmin(adminStatus);
 
-      if (!error && data && data.length > 0) {
+      // Admin vê todos os espaços, usuário normal apenas os próprios
+      let query = supabase.from("spaces").select("*").order("created_at", { ascending: true });
+      
+      if (!adminStatus) {
+        query = query.eq("user_id", user.id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Erro ao carregar espaços:", error);
+        setSpaces([]);
+      } else if (data) {
         setSpaces(
           (data as SpaceRow[]).map((s) => ({
             id: s.id,
@@ -113,39 +93,18 @@ export function useSpaces() {
             user_id: s.user_id,
           }))
         );
-      } else {
-        // Fallback para localStorage
-        setSpaces(getStoredSpaces());
       }
-    } catch {
-      setSpaces(getStoredSpaces());
+    } catch (err) {
+      console.error("Erro ao carregar espaços:", err);
+      setSpaces([]);
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, checkAdminRole]);
 
   useEffect(() => {
     fetchSpaces();
   }, [fetchSpaces]);
-
-  // Escutar mudanças de storage
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === SPACES_STORAGE_KEY) {
-        setSpaces(getStoredSpaces());
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
-
-  // Salvar espaços no localStorage (fallback)
-  const saveLocalSpaces = useCallback((newSpaces: Space[]) => {
-    localStorage.setItem(SPACES_STORAGE_KEY, JSON.stringify(newSpaces));
-    setSpaces(newSpaces);
-    window.dispatchEvent(new CustomEvent("spaces-changed"));
-  }, []);
 
   // Criar novo espaço
   const createSpace = useCallback(
@@ -154,6 +113,10 @@ export function useSpaces() {
       description: string,
       color: string
     ): Promise<{ success: boolean; error?: string; space?: Space }> => {
+      if (!user?.id) {
+        return { success: false, error: "Usuário não autenticado" };
+      }
+
       if (!label.trim()) {
         return { success: false, error: "Nome é obrigatório" };
       }
@@ -162,61 +125,46 @@ export function useSpaces() {
         return { success: false, error: "Nome deve ter no máximo 50 caracteres" };
       }
 
-      const id = generateSpaceId(label);
+      try {
+        const { data, error } = await supabase
+          .from("spaces")
+          .insert({
+            user_id: user.id,
+            label: label.trim(),
+            description: description.trim() || `Espaço ${label.trim()}`,
+            color,
+          } as any)
+          .select()
+          .single();
 
-      if (spaces.some(s => s.id === id)) {
-        return { success: false, error: "Já existe um espaço com nome similar" };
-      }
-
-      // Tentar criar no Supabase primeiro
-      if (user?.id) {
-        try {
-          const { data, error } = await supabase
-            .from("spaces")
-            .insert({
-              user_id: user.id,
-              label: label.trim(),
-              description: description.trim() || `Espaço ${label.trim()}`,
-              color,
-            } as any)
-            .select()
-            .single();
-
-          if (!error && data) {
-            const d = data as any;
-            const newSpace: Space = {
-              id: d.id,
-              label: d.label,
-              description: d.description || "",
-              color: d.color || "#c4378f",
-              createdAt: d.created_at,
-              user_id: d.user_id,
-            };
-
-            setSpaces((prev) => [...prev, newSpace]);
-            window.dispatchEvent(new CustomEvent("spaces-changed"));
-            return { success: true, space: newSpace };
-          }
-        } catch (err) {
-          console.error("Erro ao criar no Supabase, usando localStorage:", err);
+        if (error) {
+          console.error("Erro ao criar espaço:", error);
+          return { success: false, error: error.message };
         }
+
+        if (data) {
+          const d = data as any;
+          const newSpace: Space = {
+            id: d.id,
+            label: d.label,
+            description: d.description || "",
+            color: d.color || "#c4378f",
+            createdAt: d.created_at,
+            user_id: d.user_id,
+          };
+
+          setSpaces((prev) => [...prev, newSpace]);
+          window.dispatchEvent(new CustomEvent("spaces-changed"));
+          return { success: true, space: newSpace };
+        }
+
+        return { success: false, error: "Erro desconhecido ao criar espaço" };
+      } catch (err: any) {
+        console.error("Erro ao criar espaço:", err);
+        return { success: false, error: err.message || "Erro ao criar espaço" };
       }
-
-      // Fallback para localStorage
-      const newSpace: Space = {
-        id,
-        label: label.trim(),
-        description: description.trim() || `Espaço ${label.trim()}`,
-        color,
-        createdAt: new Date().toISOString(),
-      };
-
-      const newSpaces = [...spaces, newSpace];
-      saveLocalSpaces(newSpaces);
-      
-      return { success: true, space: newSpace };
     },
-    [spaces, saveLocalSpaces, user?.id]
+    [user?.id]
   );
 
   // Atualizar espaço
@@ -225,54 +173,52 @@ export function useSpaces() {
       id: string,
       updates: Partial<Omit<Space, "id" | "createdAt">>
     ): Promise<{ success: boolean; error?: string }> => {
-      const spaceIndex = spaces.findIndex(s => s.id === id);
-      
-      if (spaceIndex === -1) {
+      if (!user?.id) {
+        return { success: false, error: "Usuário não autenticado" };
+      }
+
+      const space = spaces.find(s => s.id === id);
+      if (!space) {
         return { success: false, error: "Espaço não encontrado" };
       }
 
-      // Tentar atualizar no Supabase
-      if (user?.id) {
-        try {
-          const { error } = await (supabase.from("spaces") as any)
-            .update({
-              label: updates.label,
-              description: updates.description,
-              color: updates.color,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", id);
+      try {
+        const { error } = await (supabase
+          .from("spaces") as any)
+          .update({
+            label: updates.label,
+            description: updates.description,
+            color: updates.color,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
 
-          if (!error) {
-            setSpaces((prev) =>
-              prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
-            );
-            window.dispatchEvent(new CustomEvent("spaces-changed"));
-            return { success: true };
-          }
-        } catch (err) {
-          console.error("Erro ao atualizar no Supabase:", err);
+        if (error) {
+          console.error("Erro ao atualizar espaço:", error);
+          return { success: false, error: error.message };
         }
-      }
 
-      // Fallback para localStorage
-      const updatedSpaces = [...spaces];
-      updatedSpaces[spaceIndex] = {
-        ...updatedSpaces[spaceIndex],
-        ...updates,
-      };
-      
-      saveLocalSpaces(updatedSpaces);
-      return { success: true };
+        setSpaces((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
+        );
+        window.dispatchEvent(new CustomEvent("spaces-changed"));
+        return { success: true };
+      } catch (err: any) {
+        console.error("Erro ao atualizar espaço:", err);
+        return { success: false, error: err.message || "Erro ao atualizar espaço" };
+      }
     },
-    [spaces, saveLocalSpaces, user?.id]
+    [spaces, user?.id]
   );
 
   // Excluir espaço
   const deleteSpace = useCallback(
     async (id: string): Promise<{ success: boolean; error?: string }> => {
+      if (!user?.id) {
+        return { success: false, error: "Usuário não autenticado" };
+      }
+
       const space = spaces.find(s => s.id === id);
-      
       if (!space) {
         return { success: false, error: "Espaço não encontrado" };
       }
@@ -281,28 +227,26 @@ export function useSpaces() {
         return { success: false, error: "Não é possível excluir o último espaço" };
       }
 
-      // Tentar excluir do Supabase
-      if (user?.id) {
-        try {
-          const { error } = await supabase.from("spaces").delete().eq("id", id);
+      try {
+        const { error } = await supabase
+          .from("spaces")
+          .delete()
+          .eq("id", id);
 
-          if (!error) {
-            setSpaces((prev) => prev.filter((s) => s.id !== id));
-            window.dispatchEvent(new CustomEvent("spaces-changed"));
-            return { success: true };
-          }
-        } catch (err) {
-          console.error("Erro ao excluir do Supabase:", err);
+        if (error) {
+          console.error("Erro ao excluir espaço:", error);
+          return { success: false, error: error.message };
         }
-      }
 
-      // Fallback para localStorage
-      const newSpaces = spaces.filter(s => s.id !== id);
-      saveLocalSpaces(newSpaces);
-      
-      return { success: true };
+        setSpaces((prev) => prev.filter((s) => s.id !== id));
+        window.dispatchEvent(new CustomEvent("spaces-changed"));
+        return { success: true };
+      } catch (err: any) {
+        console.error("Erro ao excluir espaço:", err);
+        return { success: false, error: err.message || "Erro ao excluir espaço" };
+      }
     },
-    [spaces, saveLocalSpaces, user?.id]
+    [spaces, user?.id]
   );
 
   // Obter IDs de todos os espaços
@@ -313,6 +257,7 @@ export function useSpaces() {
   return {
     spaces,
     isLoading,
+    isAdmin,
     createSpace,
     updateSpace,
     deleteSpace,
@@ -321,6 +266,3 @@ export function useSpaces() {
     SPACE_COLORS,
   };
 }
-
-// Exportar função síncrona para uso em contextos sem hook
-export const getAllSpaces = getStoredSpaces;

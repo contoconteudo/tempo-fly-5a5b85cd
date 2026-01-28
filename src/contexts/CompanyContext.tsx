@@ -60,12 +60,14 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
       const userIsAdmin = (roleData as any)?.role === "admin";
       setIsAdmin(userIsAdmin);
 
-      // Buscar espaços do usuário
-      const { data: spacesData, error: spacesError } = await supabase
-        .from("spaces")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
+      // Admin vê todos os espaços, usuário normal vê apenas os próprios
+      let query = supabase.from("spaces").select("*").order("created_at", { ascending: true });
+      
+      if (!userIsAdmin) {
+        query = query.eq("user_id", user.id);
+      }
+
+      const { data: spacesData, error: spacesError } = await query;
 
       if (spacesError) {
         console.error("Erro ao carregar espaços:", spacesError);
@@ -95,7 +97,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
           localStorage.setItem(STORAGE_KEY, spaceIds[0]);
         }
       } else {
-        // Nenhum espaço encontrado - criar espaços padrão
+        // Nenhum espaço encontrado
         setAvailableSpaces([]);
         setAllowedCompanies([]);
       }
