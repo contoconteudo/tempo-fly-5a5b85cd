@@ -1,265 +1,325 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useProject } from "@/contexts/ProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
-import { User, Plus, Trash2, Edit, Users, Building2 } from "lucide-react";
+import { Shield, Edit2, Save, X, Users, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { useUserRole, type AppRole } from "@/hooks/useUserRole";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-interface UserWithProjects {
+interface UserWithRole {
   id: string;
   email: string;
-  user_roles: { role: string }[];
-  user_projects: {
-    project_id: string;
-    permissions: string[];
-    projects: { name: string };
-  }[];
+  role: AppRole | null;
+  created_at: string;
+  modules: string[];
 }
 
+const AVAILABLE_ROLES: { value: AppRole; label: string; description: string }[] = [
+  { value: "admin", label: "Admin", description: "Acesso total ao sistema" },
+  { value: "gestor", label: "Gestor", description: "Gerencia estratégia, objetivos e equipe" },
+  { value: "comercial", label: "Comercial", description: "Acesso ao CRM e clientes" },
+  { value: "analista", label: "Analista", description: "Acesso básico ao dashboard" },
+];
+
+const AVAILABLE_MODULES = [
+  { id: "dashboard", label: "Dashboard", description: "Visão geral do sistema" },
+  { id: "strategy", label: "Estratégia", description: "Objetivos e metas estratégicas" },
+  { id: "crm", label: "CRM", description: "Gestão de leads e oportunidades" },
+  { id: "clients", label: "Clientes", description: "Gestão de clientes ativos" },
+  { id: "settings", label: "Configurações", description: "Configurações pessoais" },
+];
+
+// Permissões padrão por role
+const DEFAULT_PERMISSIONS: Record<AppRole, string[]> = {
+  admin: ["dashboard", "strategy", "crm", "clients", "settings", "admin"],
+  gestor: ["dashboard", "strategy", "crm", "clients", "settings"],
+  comercial: ["dashboard", "crm", "clients", "settings"],
+  analista: ["dashboard", "settings"],
+};
+
+const getRoleBadgeStyle = (role: AppRole | null) => {
+  switch (role) {
+    case "admin":
+      return "bg-red-500/10 text-red-600 border-red-500/20";
+    case "gestor":
+      return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+    case "comercial":
+      return "bg-green-500/10 text-green-600 border-green-500/20";
+    case "analista":
+      return "bg-orange-500/10 text-orange-600 border-orange-500/20";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
+};
+
 export default function AdminDashboard() {
-  const { projects } = useProject();
-  const [users, setUsers] = useState<UserWithProjects[]>([]);
+  const { isAdmin } = useUserRole();
+  const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddUser, setShowAddUser] = useState(false);
-  const [newUserEmail, setNewUserEmail] = useState("");
-  const [newUserRole, setUserRole] = useState<"admin" | "user">("user");
-  const [selectedProject, setSelectedProject] = useState<string>("");
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(["read"]);
+  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
+  const [selectedRole, setSelectedRole] = useState<AppRole | "none">("none");
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('auth.users')
-        .select(`
-          id,
-          email,
-          user_roles (role),
-          user_projects (
-            project_id,
-            permissions,
-            projects (name)
-          )
-        `);
+      // Buscar todos os usuários da tabela user_roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id, role, created_at");
 
-      if (error) throw error;
-      // Correção: Conversão para unknown antes de UserWithProjects[]
-      setUsers(data as unknown as UserWithProjects[] || []);
+      if (rolesError) {
+        console.error("Error fetching user roles:", rolesError);
+      }
+
+      // Buscar informações de usuários via função RPC ou auth admin (se disponível)
+      // Como não temos acesso direto ao auth.users, vamos usar os user_ids que temos
+      const usersMap = new Map<string, UserWithRole>();
+
+      // Adicionar usuários com roles
+      if (userRoles) {
+        for (const ur of userRoles) {
+          usersMap.set(ur.user_id, {
+            id: ur.user_id,
+            email: `Usuário ${ur.user_id.slice(0, 8)}...`,
+            role: ur.role as AppRole,
+            created_at: ur.created_at,
+            modules: DEFAULT_PERMISSIONS[ur.role as AppRole] || [],
+          });
+        }
+      }
+
+      // Tentar buscar emails via profiles se existir
+      const userIds = Array.from(usersMap.keys());
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .in("id", userIds);
+
+        if (profiles) {
+          for (const profile of profiles) {
+            const existing = usersMap.get(profile.id);
+            if (existing) {
+              usersMap.set(profile.id, {
+                ...existing,
+                email: profile.email || profile.full_name || existing.email,
+              });
+            }
+          }
+        }
+      }
+
+      setUsers(Array.from(usersMap.values()));
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error("Error fetching users:", error);
+      toast.error("Erro ao carregar usuários");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddUser = async () => {
-    if (!newUserEmail.trim() || !selectedProject) return;
+  const handleEditUser = (user: UserWithRole) => {
+    setEditingUser(user);
+    setSelectedRole(user.role || "none");
+    setSelectedModules(user.modules);
+  };
 
+  const handleRoleChange = (role: AppRole | "none") => {
+    setSelectedRole(role);
+    if (role !== "none") {
+      // Aplicar permissões padrão da role
+      setSelectedModules(DEFAULT_PERMISSIONS[role] || []);
+    } else {
+      setSelectedModules([]);
+    }
+  };
+
+  const handleSaveUser = async () => {
+    if (!editingUser) return;
+
+    setSaving(true);
     try {
-      // First, create the user in auth.users (this would normally be done via Supabase Auth signup)
-      // For now, we'll assume the user already exists and we just need to assign roles and projects
-      const { data: userData, error: userError } = await supabase
-        .from('auth.users')
-        .select('id')
-        .eq('email', newUserEmail)
-        .single();
+      if (selectedRole === "none") {
+        // Remover role do usuário
+        const { error } = await supabase
+          .from("user_roles")
+          .delete()
+          .eq("user_id", editingUser.id);
 
-      if (userError || !userData) {
-        console.error('User not found:', userError);
-        return;
+        if (error) throw error;
+        toast.success("Permissões removidas com sucesso");
+      } else {
+        // Upsert role do usuário
+        const { error } = await supabase.from("user_roles").upsert(
+          {
+            user_id: editingUser.id,
+            role: selectedRole,
+          },
+          { onConflict: "user_id" }
+        );
+
+        if (error) throw error;
+        toast.success("Permissões atualizadas com sucesso");
       }
 
-      // Assign role
-      await supabase
-        .from('user_roles')
-        .upsert({ user_id: userData.id, role: newUserRole });
-
-      // Assign project permissions
-      await supabase
-        .from('user_projects')
-        .upsert({
-          user_id: userData.id,
-          project_id: selectedProject,
-          permissions: selectedPermissions,
-        });
-
       await fetchUsers();
-      setShowAddUser(false);
-      setNewUserEmail("");
-      setUserRole("user");
-      setSelectedProject("");
-      setSelectedPermissions(["read"]);
+      setEditingUser(null);
     } catch (error) {
-      console.error('Error adding user:', error);
+      console.error("Error saving user:", error);
+      toast.error("Erro ao salvar permissões");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleRemoveUser = async (userId: string) => {
-    try {
-      await supabase
-        .from('user_projects')
-        .delete()
-        .eq('user_id', userId);
-
-      await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      await fetchUsers();
-    } catch (error) {
-      console.error('Error removing user:', error);
-    }
+  const toggleModule = (moduleId: string) => {
+    setSelectedModules((prev) =>
+      prev.includes(moduleId)
+        ? prev.filter((m) => m !== moduleId)
+        : [...prev, moduleId]
+    );
   };
+
+  if (!isAdmin) {
+    return (
+      <AppLayout title="Acesso Negado" subtitle="Você não tem permissão para acessar esta página">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Esta página é restrita a administradores do sistema.
+          </AlertDescription>
+        </Alert>
+      </AppLayout>
+    );
+  }
 
   return (
-    <AppLayout title="Admin Dashboard" subtitle="Manage users and projects">
+    <AppLayout
+      title="Administração"
+      subtitle="Gerencie usuários e permissões do sistema"
+    >
       <div className="space-y-6">
-        {/* Add User Section */}
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="section-title">Manage Users</h3>
-            <Button onClick={() => setShowAddUser(true)} className="gradient-primary text-primary-foreground gap-1.5">
-              <Plus className="h-4 w-4" />
-              Add User
-            </Button>
-          </div>
-
-          <Dialog open={showAddUser} onOpenChange={setShowAddUser}>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Add New User</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="email" className="text-right">
-                    Email
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newUserEmail}
-                    onChange={(e) => setNewUserEmail(e.target.value)}
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="role" className="text-right">
-                    Role
-                  </label>
-                  <Select value={newUserRole} onValueChange={(value: "admin" | "user") => setUserRole(value)}>
-                    <SelectTrigger className="col-span-3">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="user">User</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="project" className="text-right">
-                    Project
-                  </label>
-                  <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger className="col-span-3">
-                      <SelectValue placeholder="Select project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="permissions" className="text-right">
-                    Permissions
-                  </label>
-                  <div className="col-span-3 space-y-2">
-                    {["read", "write", "delete"].map((perm) => (
-                      <label key={perm} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedPermissions.includes(perm)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedPermissions([...selectedPermissions, perm]);
-                            } else {
-                              setSelectedPermissions(selectedPermissions.filter(p => p !== perm));
-                            }
-                          }}
-                        />
-                        <span className="capitalize">{perm}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowAddUser(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddUser}>Add User</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+        {/* Info Card */}
+        <Alert>
+          <Shield className="h-4 w-4" />
+          <AlertDescription>
+            Para adicionar um novo usuário, ele precisa primeiro criar uma conta no sistema.
+            Após o cadastro, você poderá atribuir uma role e definir suas permissões aqui.
+          </AlertDescription>
+        </Alert>
 
         {/* Users Table */}
         <div className="stat-card">
-          <h3 className="section-title mb-4">Users</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <h3 className="section-title">Usuários do Sistema</h3>
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchUsers}>
+              Atualizar Lista
+            </Button>
+          </div>
+
           {loading ? (
-            <p>Loading users...</p>
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>Nenhum usuário com role atribuída</p>
+              <p className="text-sm">
+                Usuários aparecem aqui após receberem uma role
+              </p>
+            </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Usuário</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Projects</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Módulos</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      <Badge className={cn(
-                        user.user_roles[0]?.role === 'admin' 
-                          ? "bg-primary/10 text-primary" 
-                          : "bg-muted text-muted-foreground"
-                      )}>
-                        {user.user_roles[0]?.role || 'user'}
+                      <div>
+                        <p className="font-medium">{user.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          ID: {user.id.slice(0, 8)}...
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={cn(getRoleBadgeStyle(user.role))}
+                      >
+                        {user.role || "Sem role"}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {user.user_projects.map((up) => (
-                          <Badge key={up.project_id} variant="secondary" className="text-xs">
-                            {up.projects.name}
+                        {user.modules.slice(0, 3).map((module) => (
+                          <Badge
+                            key={module}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {module}
                           </Badge>
                         ))}
+                        {user.modules.length > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{user.modules.length - 3}
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveUser(user.id)}
-                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleEditUser(user)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Edit2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -268,7 +328,152 @@ export default function AdminDashboard() {
             </Table>
           )}
         </div>
+
+        {/* Role Descriptions */}
+        <div className="stat-card">
+          <h3 className="section-title mb-4">Níveis de Acesso</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {AVAILABLE_ROLES.map((role) => (
+              <div
+                key={role.value}
+                className="p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors"
+              >
+                <Badge
+                  variant="outline"
+                  className={cn("mb-2", getRoleBadgeStyle(role.value))}
+                >
+                  {role.label}
+                </Badge>
+                <p className="text-sm text-muted-foreground">
+                  {role.description}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {DEFAULT_PERMISSIONS[role.value].map((module) => (
+                    <span
+                      key={module}
+                      className="text-xs text-muted-foreground/70"
+                    >
+                      {module}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Permissões</DialogTitle>
+            <DialogDescription>
+              Configure a role e os módulos que o usuário pode acessar
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingUser && (
+            <div className="space-y-6 py-4">
+              {/* User Info */}
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="font-medium">{editingUser.email}</p>
+                <p className="text-xs text-muted-foreground">
+                  ID: {editingUser.id}
+                </p>
+              </div>
+
+              {/* Role Selection */}
+              <div className="space-y-2">
+                <Label>Role do Usuário</Label>
+                <Select
+                  value={selectedRole}
+                  onValueChange={(v) => handleRoleChange(v as AppRole | "none")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem acesso</SelectItem>
+                    {AVAILABLE_ROLES.map((role) => (
+                      <SelectItem key={role.value} value={role.value}>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs",
+                              getRoleBadgeStyle(role.value)
+                            )}
+                          >
+                            {role.label}
+                          </Badge>
+                          <span className="text-muted-foreground text-xs">
+                            {role.description}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Module Permissions */}
+              <div className="space-y-3">
+                <Label>Módulos Permitidos</Label>
+                <div className="grid gap-2">
+                  {AVAILABLE_MODULES.map((module) => (
+                    <div
+                      key={module.id}
+                      className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-accent/5 transition-colors"
+                    >
+                      <Checkbox
+                        id={module.id}
+                        checked={selectedModules.includes(module.id)}
+                        onCheckedChange={() => toggleModule(module.id)}
+                        disabled={selectedRole === "none"}
+                      />
+                      <div className="space-y-0.5">
+                        <Label
+                          htmlFor={module.id}
+                          className="font-medium cursor-pointer"
+                        >
+                          {module.label}
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          {module.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  * Usuários padrão podem criar e editar, mas não deletar
+                  informações
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditingUser(null)}
+              disabled={saving}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveUser} disabled={saving}>
+              {saving ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+              ) : (
+                <Save className="h-4 w-4 mr-1" />
+              )}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
