@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserRole, type AppRole } from "@/hooks/useUserRole";
+import { useUserRole, type AppRole, type ModulePermission } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import { useCompany, Company } from "@/contexts/CompanyContext";
 import {
@@ -22,8 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-type ModulePermission = 'dashboard' | 'crm' | 'clients' | 'objectives' | 'strategy' | 'settings' | 'admin';
+import { STORAGE_KEYS } from "@/lib/constants";
 
 interface NavItem {
   name: string;
@@ -56,16 +55,16 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { currentCompany, setCurrentCompany, allowedCompanies, isAdmin } = useCompany();
+  const { currentCompany, setCurrentCompany, allowedCompanies, isAdmin: companyIsAdmin } = useCompany();
   const { role, canAccessModule, isLoading: roleLoading } = useUserRole();
 
   const handleSignOut = async () => {
     try {
       await signOut();
       // Clear localStorage data on logout
-      localStorage.removeItem("conto-leads");
-      localStorage.removeItem("conto-clients");
-      localStorage.removeItem("conto-objectives");
+      localStorage.removeItem(STORAGE_KEYS.LEADS);
+      localStorage.removeItem(STORAGE_KEYS.CLIENTS);
+      localStorage.removeItem(STORAGE_KEYS.OBJECTIVES);
       toast.success("Logout realizado com sucesso!");
       navigate("/login");
     } catch (error: any) {
@@ -83,7 +82,7 @@ export function Sidebar() {
     : "??";
 
   const currentInfo = companyInfo[currentCompany];
-  const availableCompanies = isAdmin ? (["conto", "amplia"] as Company[]) : allowedCompanies;
+  const availableCompanies = companyIsAdmin ? (["conto", "amplia"] as Company[]) : allowedCompanies;
   const canSwitch = availableCompanies.length > 1;
 
   return (

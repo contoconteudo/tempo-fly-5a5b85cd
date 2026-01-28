@@ -4,15 +4,13 @@ import { useCallback, useMemo } from "react";
 import { useLeads } from "./useLeads";
 import { useClients } from "./useClients";
 import { STORAGE_KEYS } from "@/lib/constants";
-
-// Dados iniciais vazios - pronto para dados reais
-const initialObjectives: Objective[] = [];
+import { MOCK_OBJECTIVES } from "@/data/mockData";
 
 function calculateStatus(currentValue: number, targetValue: number, deadline: string): ObjectiveStatus {
   const progress = (currentValue / targetValue) * 100;
   const now = new Date();
   const deadlineDate = new Date(deadline);
-  const startOfYear = new Date("2026-01-01");
+  const startOfYear = new Date("2025-01-01");
   const totalDays = (deadlineDate.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24);
   const daysElapsed = (now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24);
   const expectedProgress = (daysElapsed / totalDays) * 100;
@@ -23,7 +21,7 @@ function calculateStatus(currentValue: number, targetValue: number, deadline: st
 }
 
 export function useObjectives() {
-  const [objectives, setObjectives] = useLocalStorage<Objective[]>(STORAGE_KEYS.OBJECTIVES, initialObjectives);
+  const [objectives, setObjectives] = useLocalStorage<Objective[]>(STORAGE_KEYS.OBJECTIVES, MOCK_OBJECTIVES);
   const { leads } = useLeads();
   const { clients } = useClients();
 
@@ -76,8 +74,8 @@ export function useObjectives() {
       const newObjective: Objective = {
         ...data,
         id: crypto.randomUUID(),
-        project_id: "default", // Placeholder, should come from context
-        user_id: "1", // Placeholder, should come from auth
+        project_id: "default",
+        user_id: "current-user",
         createdAt: new Date().toISOString().split("T")[0],
         currentValue: initialValue,
         status: calculateStatus(initialValue, data.targetValue, data.deadline),

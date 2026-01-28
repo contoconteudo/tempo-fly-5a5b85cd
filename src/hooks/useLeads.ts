@@ -1,15 +1,11 @@
 import { useLocalStorage } from "./useLocalStorage";
 import { Lead, LeadStage } from "@/types";
 import { useCallback, useEffect } from "react";
-import { useProject } from "@/contexts/ProjectContext";
 import { STORAGE_KEYS, AUTOMATION_CONFIG } from "@/lib/constants";
-
-// Dados iniciais vazios - pronto para dados reais
-const initialLeads: Lead[] = [];
+import { MOCK_LEADS } from "@/data/mockData";
 
 export function useLeads() {
-  const [leads, setLeads] = useLocalStorage<Lead[]>(STORAGE_KEYS.LEADS, initialLeads);
-  const { currentProject } = useProject();
+  const [leads, setLeads] = useLocalStorage<Lead[]>(STORAGE_KEYS.LEADS, MOCK_LEADS);
 
   const addLead = useCallback(
     (data: Omit<Lead, "id" | "createdAt" | "stageChangedAt" | "project_id" | "user_id">) => {
@@ -17,15 +13,15 @@ export function useLeads() {
       const newLead: Lead = {
         ...data,
         id: crypto.randomUUID(),
-        project_id: currentProject?.id || "default",
-        user_id: "1", // This should come from the auth context
+        project_id: "default",
+        user_id: "current-user",
         createdAt: now.split("T")[0],
         stageChangedAt: now,
       };
       setLeads((prev) => [...prev, newLead]);
       return newLead;
     },
-    [setLeads, currentProject]
+    [setLeads]
   );
 
   const updateLead = useCallback(

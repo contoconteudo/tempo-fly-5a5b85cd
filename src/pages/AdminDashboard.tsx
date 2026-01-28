@@ -1,6 +1,5 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { supabase } from "@/integrations/supabase/client";
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Shield, Edit2, Save, X, Users, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,15 +30,17 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { useUserRole, type AppRole } from "@/hooks/useUserRole";
+import { useUserRole, type AppRole, type ModulePermission } from "@/hooks/useUserRole";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MOCK_USERS, DEFAULT_ROLE_PERMISSIONS } from "@/data/mockData";
 
 interface UserWithRole {
   id: string;
   email: string;
-  role: AppRole | null;
+  full_name: string;
+  role: AppRole;
   created_at: string;
-  modules: string[];
+  modules: ModulePermission[];
 }
 
 const AVAILABLE_ROLES: { value: AppRole; label: string; description: string }[] = [
@@ -49,7 +50,7 @@ const AVAILABLE_ROLES: { value: AppRole; label: string; description: string }[] 
   { value: "analista", label: "Analista", description: "Acesso básico ao dashboard" },
 ];
 
-const AVAILABLE_MODULES = [
+const AVAILABLE_MODULES: { id: ModulePermission; label: string; description: string }[] = [
   { id: "dashboard", label: "Dashboard", description: "Visão geral do sistema" },
   { id: "strategy", label: "Estratégia", description: "Objetivos e metas estratégicas" },
   { id: "crm", label: "CRM", description: "Gestão de leads e oportunidades" },
@@ -57,15 +58,7 @@ const AVAILABLE_MODULES = [
   { id: "settings", label: "Configurações", description: "Configurações pessoais" },
 ];
 
-// Permissões padrão por role
-const DEFAULT_PERMISSIONS: Record<AppRole, string[]> = {
-  admin: ["dashboard", "strategy", "crm", "clients", "settings", "admin"],
-  gestor: ["dashboard", "strategy", "crm", "clients", "settings"],
-  comercial: ["dashboard", "crm", "clients", "settings"],
-  analista: ["dashboard", "settings"],
-};
-
-const getRoleBadgeStyle = (role: AppRole | null) => {
+const getRoleBadgeStyle = (role: AppRole) => {
   switch (role) {
     case "admin":
       return "bg-red-500/10 text-red-600 border-red-500/20";
@@ -82,132 +75,52 @@ const getRoleBadgeStyle = (role: AppRole | null) => {
 
 export default function AdminDashboard() {
   const { isAdmin } = useUserRole();
-  const [users, setUsers] = useState<UserWithRole[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
-  const [selectedRole, setSelectedRole] = useState<AppRole | "none">("none");
-  const [selectedModules, setSelectedModules] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    fetchUsers();
+  
+  // Usar dados mockados diretamente
+  const users: UserWithRole[] = useMemo(() => {
+    return MOCK_USERS.map((user) => ({
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+      role: user.role,
+      created_at: user.created_at,
+      modules: DEFAULT_ROLE_PERMISSIONS[user.role],
+    }));
   }, []);
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      // Buscar TODOS os usuários da tabela profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, created_at");
-
-      if (profilesError) {
-        console.error("Error fetching profiles:", profilesError);
-        toast.error("Erro ao carregar usuários");
-        setLoading(false);
-        return;
-      }
-
-      // Buscar roles existentes
-      const { data: userRoles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
-
-      if (rolesError) {
-        console.error("Error fetching user roles:", rolesError);
-      }
-
-      // Criar mapa de roles
-      const rolesMap = new Map<string, AppRole>();
-      if (userRoles) {
-        for (const ur of userRoles) {
-          rolesMap.set(ur.user_id, ur.role as AppRole);
-        }
-      }
-
-      // Combinar dados
-      const combinedUsers: UserWithRole[] = (profiles || []).map((profile) => {
-        const role = rolesMap.get(profile.id) || null;
-        return {
-          id: profile.id,
-          email: profile.email || profile.full_name || `Usuário ${profile.id.slice(0, 8)}...`,
-          role,
-          created_at: profile.created_at,
-          modules: role ? DEFAULT_PERMISSIONS[role] : [],
-        };
-      });
-
-      // Ordenar: usuários sem role primeiro, depois por email
-      combinedUsers.sort((a, b) => {
-        if (!a.role && b.role) return -1;
-        if (a.role && !b.role) return 1;
-        return a.email.localeCompare(b.email);
-      });
-
-      setUsers(combinedUsers);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      toast.error("Erro ao carregar usuários");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
+  const [selectedRole, setSelectedRole] = useState<AppRole>("analista");
+  const [selectedModules, setSelectedModules] = useState<ModulePermission[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const handleEditUser = (user: UserWithRole) => {
     setEditingUser(user);
-    setSelectedRole(user.role || "none");
+    setSelectedRole(user.role);
     setSelectedModules(user.modules);
   };
 
-  const handleRoleChange = (role: AppRole | "none") => {
+  const handleRoleChange = (role: AppRole) => {
     setSelectedRole(role);
-    if (role !== "none") {
-      // Aplicar permissões padrão da role
-      setSelectedModules(DEFAULT_PERMISSIONS[role] || []);
-    } else {
-      setSelectedModules([]);
-    }
+    // Aplicar permissões padrão da role
+    setSelectedModules(DEFAULT_ROLE_PERMISSIONS[role] || []);
   };
 
   const handleSaveUser = async () => {
     if (!editingUser) return;
 
     setSaving(true);
-    try {
-      if (selectedRole === "none") {
-        // Remover role do usuário
-        const { error } = await supabase
-          .from("user_roles")
-          .delete()
-          .eq("user_id", editingUser.id);
-
-        if (error) throw error;
-        toast.success("Permissões removidas com sucesso");
-      } else {
-        // Upsert role do usuário
-        const { error } = await supabase.from("user_roles").upsert(
-          {
-            user_id: editingUser.id,
-            role: selectedRole,
-          },
-          { onConflict: "user_id" }
-        );
-
-        if (error) throw error;
-        toast.success("Permissões atualizadas com sucesso");
-      }
-
-      await fetchUsers();
-      setEditingUser(null);
-    } catch (error) {
-      console.error("Error saving user:", error);
-      toast.error("Erro ao salvar permissões");
-    } finally {
-      setSaving(false);
-    }
+    
+    // Simular salvamento (em produção, iria para o backend)
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    
+    toast.success("Permissões atualizadas com sucesso (modo demo)");
+    toast.info("Em produção, as alterações seriam salvas no banco de dados.");
+    
+    setSaving(false);
+    setEditingUser(null);
   };
 
-  const toggleModule = (moduleId: string) => {
+  const toggleModule = (moduleId: ModulePermission) => {
     setSelectedModules((prev) =>
       prev.includes(moduleId)
         ? prev.filter((m) => m !== moduleId)
@@ -235,11 +148,11 @@ export default function AdminDashboard() {
     >
       <div className="space-y-6">
         {/* Info Card */}
-        <Alert>
+        <Alert className="bg-primary/5 border-primary/20">
           <Shield className="h-4 w-4" />
           <AlertDescription>
-            Para adicionar um novo usuário, ele precisa primeiro criar uma conta no sistema.
-            Após o cadastro, você poderá atribuir uma role e definir suas permissões aqui.
+            <strong>Modo Demonstração:</strong> Os dados são mockados. Em produção, 
+            os usuários serão carregados do banco de dados e as alterações serão persistidas.
           </AlertDescription>
         </Alert>
 
@@ -250,84 +163,70 @@ export default function AdminDashboard() {
               <Users className="h-5 w-5 text-primary" />
               <h3 className="section-title">Usuários do Sistema</h3>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchUsers}>
-              Atualizar Lista
-            </Button>
+            <Badge variant="outline" className="text-xs">
+              {users.length} usuário(s)
+            </Badge>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : users.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Nenhum usuário com role atribuída</p>
-              <p className="text-sm">
-                Usuários aparecem aqui após receberem uma role
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Módulos</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Usuário</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Módulos</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{user.full_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={cn(getRoleBadgeStyle(user.role))}
+                    >
+                      {user.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {user.modules.slice(0, 3).map((module) => (
+                        <Badge
+                          key={module}
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          {module}
+                        </Badge>
+                      ))}
+                      {user.modules.length > 3 && (
+                        <Badge variant="secondary" className="text-xs">
+                          +{user.modules.length - 3}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditUser(user)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{user.email}</p>
-                        <p className="text-xs text-muted-foreground">
-                          ID: {user.id.slice(0, 8)}...
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={cn(getRoleBadgeStyle(user.role))}
-                      >
-                        {user.role || "Sem role"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {user.modules.slice(0, 3).map((module) => (
-                          <Badge
-                            key={module}
-                            variant="secondary"
-                            className="text-xs"
-                          >
-                            {module}
-                          </Badge>
-                        ))}
-                        {user.modules.length > 3 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{user.modules.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditUser(user)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ))}
+            </TableBody>
+          </Table>
         </div>
 
         {/* Role Descriptions */}
@@ -349,7 +248,7 @@ export default function AdminDashboard() {
                   {role.description}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {DEFAULT_PERMISSIONS[role.value].map((module) => (
+                  {DEFAULT_ROLE_PERMISSIONS[role.value].map((module) => (
                     <span
                       key={module}
                       className="text-xs text-muted-foreground/70"
@@ -378,10 +277,8 @@ export default function AdminDashboard() {
             <div className="space-y-6 py-4">
               {/* User Info */}
               <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="font-medium">{editingUser.email}</p>
-                <p className="text-xs text-muted-foreground">
-                  ID: {editingUser.id}
-                </p>
+                <p className="font-medium">{editingUser.full_name}</p>
+                <p className="text-sm text-muted-foreground">{editingUser.email}</p>
               </div>
 
               {/* Role Selection */}
@@ -389,13 +286,12 @@ export default function AdminDashboard() {
                 <Label>Role do Usuário</Label>
                 <Select
                   value={selectedRole}
-                  onValueChange={(v) => handleRoleChange(v as AppRole | "none")}
+                  onValueChange={(v) => handleRoleChange(v as AppRole)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Sem acesso</SelectItem>
                     {AVAILABLE_ROLES.map((role) => (
                       <SelectItem key={role.value} value={role.value}>
                         <div className="flex items-center gap-2">
@@ -431,7 +327,6 @@ export default function AdminDashboard() {
                         id={module.id}
                         checked={selectedModules.includes(module.id)}
                         onCheckedChange={() => toggleModule(module.id)}
-                        disabled={selectedRole === "none"}
                       />
                       <div className="space-y-0.5">
                         <Label
@@ -448,8 +343,7 @@ export default function AdminDashboard() {
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  * Usuários padrão podem criar e editar, mas não deletar
-                  informações
+                  * Alterações serão salvas no banco de dados em produção
                 </p>
               </div>
             </div>

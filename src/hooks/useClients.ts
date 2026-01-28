@@ -2,9 +2,7 @@ import { useLocalStorage } from "./useLocalStorage";
 import { Client, NPSRecord, ClientStatus } from "@/types";
 import { useCallback, useMemo } from "react";
 import { STORAGE_KEYS } from "@/lib/constants";
-
-// Dados iniciais vazios - pronto para dados reais
-const initialClients: Client[] = [];
+import { MOCK_CLIENTS } from "@/data/mockData";
 
 // Helper function to calculate average NPS from history
 export function calculateClientNPS(npsHistory: NPSRecord[]): number {
@@ -24,15 +22,15 @@ export function getLatestNPS(npsHistory: NPSRecord[]): number | null {
 }
 
 export function useClients() {
-  const [clients, setClients] = useLocalStorage<Client[]>(STORAGE_KEYS.CLIENTS, initialClients);
+  const [clients, setClients] = useLocalStorage<Client[]>(STORAGE_KEYS.CLIENTS, MOCK_CLIENTS);
 
   const addClient = useCallback(
     (data: Omit<Client, "id" | "project_id" | "user_id">) => {
       const newClient: Client = {
         ...data,
         id: crypto.randomUUID(),
-        project_id: "default", // Placeholder, should come from context
-        user_id: "1", // Placeholder, should come from auth
+        project_id: "default",
+        user_id: "current-user",
       };
       setClients((prev) => [...prev, newClient]);
       return newClient;

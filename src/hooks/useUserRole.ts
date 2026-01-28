@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { MOCK_USERS, MODULE_PERMISSIONS, AppRole, ModulePermission } from "@/data/mockData";
 
-export type AppRole = 'admin' | 'gestor' | 'comercial' | 'analista';
+// Re-exportando tipos para uso externo
+export type { AppRole, ModulePermission };
 
 interface UseUserRoleReturn {
   role: AppRole | null;
@@ -15,55 +16,33 @@ interface UseUserRoleReturn {
   canAccessModule: (module: ModulePermission) => boolean;
 }
 
-type ModulePermission = 'dashboard' | 'crm' | 'clients' | 'objectives' | 'strategy' | 'settings' | 'admin';
-
-const MODULE_PERMISSIONS: Record<ModulePermission, AppRole[]> = {
-  dashboard: ['admin', 'gestor', 'comercial', 'analista'],
-  crm: ['admin', 'gestor', 'comercial'],
-  clients: ['admin', 'gestor', 'comercial'],
-  objectives: ['admin', 'gestor'],
-  strategy: ['admin', 'gestor'],
-  settings: ['admin', 'gestor', 'comercial', 'analista'],
-  admin: ['admin'],
-};
-
 export function useUserRole(): UseUserRoleReturn {
   const { user, isLoading: authLoading } = useAuth();
   const [role, setRole] = useState<AppRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchRole() {
-      if (!user) {
-        setRole(null);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error fetching user role:', error);
-          setRole(null);
-        } else {
-          setRole(data?.role as AppRole | null);
-        }
-      } catch (err) {
-        console.error('Error fetching user role:', err);
-        setRole(null);
-      } finally {
-        setIsLoading(false);
-      }
+    if (authLoading) {
+      return;
     }
 
-    if (!authLoading) {
-      fetchRole();
+    if (!user) {
+      setRole(null);
+      setIsLoading(false);
+      return;
     }
+
+    // Busca role do usuário nos dados mockados
+    const mockUser = MOCK_USERS.find((u) => u.id === user.id);
+    
+    if (mockUser) {
+      setRole(mockUser.role);
+    } else {
+      // Usuário novo criado via signUp - default para analista
+      setRole("analista");
+    }
+    
+    setIsLoading(false);
   }, [user, authLoading]);
 
   const hasRole = (checkRole: AppRole): boolean => role === checkRole;
@@ -76,10 +55,10 @@ export function useUserRole(): UseUserRoleReturn {
   return {
     role,
     isLoading: isLoading || authLoading,
-    isAdmin: role === 'admin',
-    isGestor: role === 'gestor',
-    isComercial: role === 'comercial',
-    isAnalista: role === 'analista',
+    isAdmin: role === "admin",
+    isGestor: role === "gestor",
+    isComercial: role === "comercial",
+    isAnalista: role === "analista",
     hasRole,
     canAccessModule,
   };
