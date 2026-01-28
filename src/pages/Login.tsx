@@ -15,7 +15,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
 
-  // Redirecionar automaticamente quando autenticado
+  // Redirecionar se já estiver autenticado (apenas para acesso direto à página)
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       navigate("/", { replace: true });
@@ -30,19 +30,24 @@ export default function Login() {
       if (isSignUp) {
         await signUp(email, password);
         toast.success("Conta criada com sucesso!");
-        // O useEffect cuidará do redirecionamento quando isAuthenticated mudar
       } else {
         await signIn(email, password);
         toast.success("Login realizado com sucesso!");
-        // O useEffect cuidará do redirecionamento quando isAuthenticated mudar
       }
+      
+      // Redirecionamento forçado e imperativo após sucesso
+      // Usa window.location.href para garantir um reset completo do estado
+      window.location.href = "/";
     } catch (error: any) {
+      console.error("Erro de autenticação:", error);
       toast.error(error.message || "Erro ao processar solicitação");
       setIsLoading(false);
     }
+    // Nota: Não resetamos isLoading no sucesso pois o redirecionamento vai desmontar o componente
   };
 
-  // Mostrar loading enquanto verifica autenticação inicial
+  // Mostrar loading apenas durante verificação inicial de sessão existente
+  // Se terminar de carregar sem sessão, mostra o formulário
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
