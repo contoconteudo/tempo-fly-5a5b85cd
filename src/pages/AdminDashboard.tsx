@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useState, useEffect } from "react";
-import { Shield, Edit2, Save, X, Users, AlertCircle, Info, Building2 } from "lucide-react";
+import { Shield, Edit2, Save, X, Users, AlertCircle, Info, Building2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -30,10 +30,12 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useUserRole, type AppRole, type ModulePermission, type CompanyAccess } from "@/hooks/useUserRole";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ALL_MODULES, ALL_COMPANIES, DEFAULT_ROLE_PERMISSIONS, MockUser } from "@/data/mockData";
+import { ALL_MODULES, DEFAULT_ROLE_PERMISSIONS, MockUser, getCompanies } from "@/data/mockData";
 import { Separator } from "@/components/ui/separator";
+import { useSpaces, Space, SPACE_COLORS } from "@/hooks/useSpaces";
 
 const AVAILABLE_ROLES: { value: AppRole; label: string; description: string }[] = [
   { value: "admin", label: "Admin", description: "Acesso total ao sistema" },
@@ -59,6 +61,7 @@ const getRoleBadgeStyle = (role: AppRole) => {
 
 export default function AdminDashboard() {
   const { isAdmin, getAllUsers, updateUserPermissions, updateUserRole } = useUserRole();
+  const { spaces, createSpace, deleteSpace, SPACE_COLORS } = useSpaces();
   
   const [users, setUsers] = useState<MockUser[]>([]);
   const [editingUser, setEditingUser] = useState<MockUser | null>(null);
@@ -66,6 +69,15 @@ export default function AdminDashboard() {
   const [selectedModules, setSelectedModules] = useState<ModulePermission[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<CompanyAccess[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Estado para criar novo espaço
+  const [showNewSpaceDialog, setShowNewSpaceDialog] = useState(false);
+  const [newSpaceName, setNewSpaceName] = useState("");
+  const [newSpaceDescription, setNewSpaceDescription] = useState("");
+  const [newSpaceColor, setNewSpaceColor] = useState(SPACE_COLORS[2].value); // Verde por padrão
+
+  // Estado para confirmar exclusão de espaço
+  const [deletingSpace, setDeletingSpace] = useState<Space | null>(null);
 
   // Carregar usuários
   useEffect(() => {
@@ -139,7 +151,35 @@ export default function AdminDashboard() {
   };
 
   const selectAllCompanies = () => {
-    setSelectedCompanies(ALL_COMPANIES.map((c) => c.id));
+    setSelectedCompanies(spaces.map((c) => c.id));
+  };
+
+  // Handlers para gestão de espaços
+  const handleCreateSpace = () => {
+    const result = createSpace(newSpaceName, newSpaceDescription, newSpaceColor);
+    
+    if (result.success) {
+      toast.success(`Espaço "${result.space?.label}" criado com sucesso!`);
+      setShowNewSpaceDialog(false);
+      setNewSpaceName("");
+      setNewSpaceDescription("");
+      setNewSpaceColor(SPACE_COLORS[2].value);
+    } else {
+      toast.error(result.error || "Erro ao criar espaço");
+    }
+  };
+
+  const handleDeleteSpace = () => {
+    if (!deletingSpace) return;
+    
+    const result = deleteSpace(deletingSpace.id);
+    
+    if (result.success) {
+      toast.success(`Espaço "${deletingSpace.label}" excluído!`);
+      setDeletingSpace(null);
+    } else {
+      toast.error(result.error || "Erro ao excluir espaço");
+    }
   };
 
   if (!isAdmin) {
@@ -223,16 +263,14 @@ export default function AdminDashboard() {
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {user.companies.map((company) => {
-                          const companyInfo = ALL_COMPANIES.find((c) => c.id === company);
+                          const companyInfo = spaces.find((c) => c.id === company);
                           return (
                             <Badge
                               key={company}
                               variant="outline"
                               className={cn(
                                 "text-xs",
-                                company === "conto" 
-                                  ? "bg-primary/10 text-primary border-primary/30" 
-                                  : "bg-blue-500/10 text-blue-600 border-blue-500/30"
+                                companyInfo?.color ? `${companyInfo.color.replace('bg-', 'bg-')}/10 border-${companyInfo.color.replace('bg-', '')}/30` : ""
                               )}
                             >
                               {companyInfo?.label || company}
@@ -289,27 +327,44 @@ export default function AdminDashboard() {
 
         {/* Spaces Overview */}
         <div className="stat-card">
-          <div className="flex items-center gap-2 mb-4">
-            <Building2 className="h-5 w-5 text-primary" />
-            <h3 className="section-title">Espaços Disponíveis</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              <h3 className="section-title">Espaços Disponíveis</h3>
+            </div>
+            <Button size="sm" onClick={() => setShowNewSpaceDialog(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Novo Espaço
+            </Button>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {ALL_COMPANIES.map((company) => (
+            {spaces.map((space) => (
               <div
-                key={company.id}
+                key={space.id}
                 className="p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "h-10 w-10 rounded-lg flex items-center justify-center",
-                    company.color
-                  )}>
-                    <Building2 className="h-5 w-5 text-white" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "h-10 w-10 rounded-lg flex items-center justify-center",
+                      space.color
+                    )}>
+                      <Building2 className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{space.label}</p>
+                      <p className="text-sm text-muted-foreground">{space.description}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">{company.label}</p>
-                    <p className="text-sm text-muted-foreground">{company.description}</p>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => setDeletingSpace(space)}
+                    title="Excluir espaço"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}
@@ -420,7 +475,7 @@ export default function AdminDashboard() {
                   </Button>
                 </div>
                 <div className="grid gap-2">
-                  {ALL_COMPANIES.map((company) => (
+                  {spaces.map((company) => (
                     <div
                       key={company.id}
                       className={cn(
@@ -557,6 +612,103 @@ export default function AdminDashboard() {
                 <Save className="h-4 w-4 mr-1" />
               )}
               Salvar Permissões
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Space Dialog */}
+      <Dialog open={showNewSpaceDialog} onOpenChange={setShowNewSpaceDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Criar Novo Espaço</DialogTitle>
+            <DialogDescription>
+              Adicione um novo espaço de trabalho para organizar dados separadamente
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="space-name">Nome do Espaço *</Label>
+              <Input
+                id="space-name"
+                value={newSpaceName}
+                onChange={(e) => setNewSpaceName(e.target.value)}
+                placeholder="Ex: Nova Agência"
+                maxLength={50}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="space-description">Descrição</Label>
+              <Input
+                id="space-description"
+                value={newSpaceDescription}
+                onChange={(e) => setNewSpaceDescription(e.target.value)}
+                placeholder="Ex: Agência Nova Agência"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cor</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {SPACE_COLORS.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    onClick={() => setNewSpaceColor(color.value)}
+                    className={cn(
+                      "h-10 rounded-lg flex items-center justify-center transition-all",
+                      color.value,
+                      newSpaceColor === color.value
+                        ? "ring-2 ring-offset-2 ring-primary"
+                        : "opacity-70 hover:opacity-100"
+                    )}
+                    title={color.label}
+                  >
+                    <Building2 className="h-5 w-5 text-white" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewSpaceDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateSpace} disabled={!newSpaceName.trim()}>
+              <Plus className="h-4 w-4 mr-1" />
+              Criar Espaço
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Space Confirmation Dialog */}
+      <Dialog open={!!deletingSpace} onOpenChange={() => setDeletingSpace(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Excluir Espaço</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir o espaço "{deletingSpace?.label}"?
+            </DialogDescription>
+          </DialogHeader>
+
+          <Alert variant="destructive" className="mt-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Esta ação não pode ser desfeita. Usuários com acesso apenas a este espaço perderão acesso ao sistema.
+            </AlertDescription>
+          </Alert>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setDeletingSpace(null)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSpace}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              Excluir Espaço
             </Button>
           </DialogFooter>
         </DialogContent>

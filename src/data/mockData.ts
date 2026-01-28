@@ -16,7 +16,8 @@ import { Lead, Client, Objective, NPSRecord } from "@/types";
 
 export type AppRole = "admin" | "gestor" | "comercial" | "analista";
 export type ModulePermission = "dashboard" | "crm" | "clients" | "objectives" | "strategy" | "settings" | "admin";
-export type CompanyAccess = "conto" | "amplia";
+// CompanyAccess agora é string para suportar espaços dinâmicos
+export type CompanyAccess = string;
 
 export interface MockUser {
   id: string;
@@ -97,13 +98,28 @@ export const MOCK_USERS: MockUser[] = DEMO_MODE_ONLY ? [
 ] : [];
 
 // ============================================
-// ESPAÇOS DISPONÍVEIS
+// ESPAÇOS DISPONÍVEIS (agora gerenciados dinamicamente via useSpaces)
+// Este export é mantido para compatibilidade, mas usa dados dinâmicos
 // ============================================
 
-export const ALL_COMPANIES: { id: CompanyAccess; label: string; description: string; color: string }[] = [
-  { id: "conto", label: "Conto", description: "Agência Conto", color: "bg-primary" },
-  { id: "amplia", label: "Amplia", description: "Agência Amplia", color: "bg-blue-600" },
-];
+import { getAllSpaces } from "@/hooks/useSpaces";
+
+// Função para obter ALL_COMPANIES dinamicamente
+export const getCompanies = () => getAllSpaces().map(s => ({
+  id: s.id,
+  label: s.label,
+  description: s.description,
+  color: s.color,
+}));
+
+// ALL_COMPANIES agora é calculado dinamicamente
+// Mantido como getter para compatibilidade
+export const ALL_COMPANIES = getAllSpaces().map(s => ({
+  id: s.id,
+  label: s.label,
+  description: s.description,
+  color: s.color,
+}));
 
 // ============================================
 // PERMISSÕES - Módulos disponíveis para seleção
