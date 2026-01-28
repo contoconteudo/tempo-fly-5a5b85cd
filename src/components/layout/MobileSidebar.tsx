@@ -62,7 +62,7 @@ export function MobileSidebar() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { currentCompany, setCurrentCompany, allowedCompanies, availableSpaces, isAdmin: companyIsAdmin } = useCompany();
-  const { role, canAccessModule } = useUserRole();
+  const { role, canAccessModule, isLoading: roleLoading } = useUserRole();
   const [open, setOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -176,24 +176,35 @@ export function MobileSidebar() {
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            {navigation
-              .filter((item) => canAccessModule(item.module))
-              .map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <button
-                    key={item.name}
-                    onClick={() => handleNavClick(item.href)}
-                    className={cn(
-                      "sidebar-item w-full text-left",
-                      isActive && "sidebar-item-active"
-                    )}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                    <span>{item.name}</span>
-                  </button>
-                );
-              })}
+            {roleLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="h-10 rounded-lg bg-sidebar-accent/40 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
+              navigation
+                .filter((item) => canAccessModule(item.module))
+                .map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => handleNavClick(item.href)}
+                      className={cn(
+                        "sidebar-item w-full text-left",
+                        isActive && "sidebar-item-active"
+                      )}
+                    >
+                      <item.icon className="h-5 w-5 flex-shrink-0" />
+                      <span>{item.name}</span>
+                    </button>
+                  );
+                })
+            )}
           </nav>
 
           {/* User section */}

@@ -20,7 +20,22 @@ const navigation: NavItem[] = [
 
 export function MobileNav() {
   const location = useLocation();
-  const { canAccessModule, isAdmin } = useUserRole();
+  const { canAccessModule, isAdmin, isLoading } = useUserRole();
+
+  if (isLoading) {
+    return (
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-sidebar border-t border-sidebar-border md:hidden safe-area-bottom">
+        <div className="flex items-center justify-around h-16 px-2">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="flex flex-col items-center justify-center gap-2 px-3 py-2 min-w-[60px]">
+              <div className="h-5 w-5 rounded bg-sidebar-accent/40 animate-pulse" />
+              <div className="h-2 w-10 rounded bg-sidebar-accent/40 animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </nav>
+    );
+  }
 
   const visibleNavItems = navigation.filter((item) => canAccessModule(item.module));
   

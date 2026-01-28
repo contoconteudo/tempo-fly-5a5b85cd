@@ -161,24 +161,35 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation
-            .filter((item) => canAccessModule(item.module))
-            .map((item) => {
-              const isActive = location.pathname === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
-                    "sidebar-item",
-                    isActive && "sidebar-item-active"
-                  )}
-                >
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
+          {roleLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="h-10 rounded-lg bg-sidebar-accent/40 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : (
+            navigation
+              .filter((item) => canAccessModule(item.module))
+              .map((item) => {
+                const isActive = location.pathname === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={cn(
+                      "sidebar-item",
+                      isActive && "sidebar-item-active"
+                    )}
+                  >
+                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })
+          )}
         </nav>
 
         {/* User section */}
