@@ -1,8 +1,9 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { User, Link, Bell } from "lucide-react";
+import { User, Link, Bell, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { useProject } from "@/contexts/ProjectContext";
 
 const settingsSections = [
   {
@@ -26,8 +27,24 @@ const settingsSections = [
 ];
 
 export default function Configuracoes() {
+  const { userRole } = useProject();
+
   return (
     <AppLayout title="Configurações" subtitle="Administração do sistema">
+      {/* Admin Dashboard Link */}
+      {userRole === 'admin' && (
+        <div className="mb-6">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-2"
+            onClick={() => window.location.href = '/admin'}
+          >
+            <Shield className="h-4 w-4" />
+            Ir para Dashboard Admin
+          </Button>
+        </div>
+      )}
+
       {/* Settings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {settingsSections.map((section) => {

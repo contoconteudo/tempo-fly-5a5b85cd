@@ -1,69 +1,42 @@
-// Tipos para Objetivos Estratégicos
-export type ObjectiveValueType = "financial" | "quantity" | "percentage";
-export type ObjectiveStatus = "on_track" | "at_risk" | "behind";
+export type UserRole = 'admin' | 'user';
 
-// Fontes de dados para metas comerciais automáticas
-export type CommercialDataSource = "crm" | "clients";
-
-export interface ProgressLog {
-  id: string;
-  month: number; // 1-12
-  year: number;
-  value: number;
-  description: string;
-  date: string; // data do registro
-}
-
-export interface Objective {
+export interface Project {
   id: string;
   name: string;
-  description: string;
-  valueType: ObjectiveValueType;
-  targetValue: number;
-  currentValue: number;
-  deadline: string;
-  status: ObjectiveStatus;
-  createdAt: string;
-  progressLogs: ProgressLog[];
-  // Campos para metas comerciais automáticas
-  isCommercial: boolean;
-  dataSources: CommercialDataSource[];
+  description?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-// Tipos para Leads (CRM)
-export type LeadTemperature = "hot" | "warm" | "cold";
-export type LeadStage = "new" | "contact" | "meeting_scheduled" | "meeting_done" | "proposal" | "followup" | "negotiation" | "won" | "lost";
+export interface User {
+  id: string;
+  email: string;
+  user_roles: UserRole[];
+}
 
+// Existing types remain the same but will be updated to include project_id
 export interface Lead {
   id: string;
+  project_id: string;
+  user_id: string;
   name: string;
   company: string;
   email: string;
   phone: string;
   value: number;
-  temperature: LeadTemperature;
+  temperature: 'hot' | 'warm' | 'cold';
   origin: string;
-  stage: LeadStage;
+  stage: 'new' | 'contact' | 'meeting_scheduled' | 'meeting_done' | 'proposal' | 'followup' | 'negotiation' | 'won' | 'lost';
   lastContact: string;
   notes: string;
   createdAt: string;
   stageChangedAt: string;
 }
 
-// Tipos para Clientes
-export type ClientStatus = "active" | "inactive" | "churn";
-
-export interface NPSRecord {
-  id: string;
-  month: number; // 1-12
-  year: number;
-  score: number;
-  notes: string;
-  recordedAt: string;
-}
-
 export interface Client {
   id: string;
+  project_id: string;
+  user_id: string;
   company: string;
   contact: string;
   email: string;
@@ -71,18 +44,45 @@ export interface Client {
   segment: string;
   package: string;
   monthlyValue: number;
-  status: ClientStatus;
+  status: 'active' | 'inactive' | 'churn';
   npsHistory: NPSRecord[];
   startDate: string;
   notes: string;
 }
 
-// Tipos para Metas Bimestrais
-export interface BimonthlyGoal {
+export interface NPSRecord {
   id: string;
+  client_id: string;
+  month: number;
+  year: number;
+  score: number;
+  notes: string;
+  recordedAt: string;
+}
+
+export interface Objective {
+  id: string;
+  project_id: string;
+  user_id: string;
   name: string;
-  period: string;
+  description: string;
+  valueType: 'financial' | 'quantity' | 'percentage';
   targetValue: number;
   currentValue: number;
-  valueType: ObjectiveValueType;
+  deadline: string;
+  status: 'on_track' | 'at_risk' | 'behind';
+  createdAt: string;
+  progressLogs: ProgressLog[];
+  isCommercial: boolean;
+  dataSources: ('crm' | 'clients')[];
+}
+
+export interface ProgressLog {
+  id: string;
+  objective_id: string;
+  month: number;
+  year: number;
+  value: number;
+  description: string;
+  date: string;
 }

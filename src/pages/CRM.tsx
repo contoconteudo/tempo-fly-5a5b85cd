@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LEAD_STAGES, LEAD_TEMPERATURES, PIPELINE_STAGES } from "@/lib/constants";
+import { useProject } from "@/contexts/ProjectContext";
 
 const TemperatureIcon = ({ temp }: { temp: "hot" | "warm" | "cold" }) => {
   const config = {
@@ -113,6 +114,7 @@ function LeadCard({
 }
 
 export default function CRM() {
+  const { currentProject } = useProject();
   const { leads, addLead, updateLead, deleteLead, moveLeadToStage, getLeadsByStage, getPipelineStats } = useLeads();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createFormStage, setCreateFormStage] = useState<LeadStage>("new");
