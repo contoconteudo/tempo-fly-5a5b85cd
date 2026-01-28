@@ -7,12 +7,19 @@ import {
   Settings,
   LogOut,
   Building2,
-  Plus,
-  FolderOpen,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useCompany, Company } from "@/contexts/CompanyContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -22,10 +29,22 @@ const navigation = [
   { name: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
+const companyInfo: Record<Company, { name: string; gradient: string }> = {
+  conto: { 
+    name: "Conto", 
+    gradient: "bg-gradient-to-br from-primary to-primary/80" 
+  },
+  amplia: { 
+    name: "Amplia", 
+    gradient: "bg-gradient-to-br from-blue-600 to-blue-500" 
+  },
+};
+
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { currentCompany, setCurrentCompany, allowedCompanies, isAdmin } = useCompany();
 
   const handleSignOut = async () => {
     try {
@@ -41,24 +60,80 @@ export function Sidebar() {
     }
   };
 
+  const handleCompanyChange = (company: Company) => {
+    setCurrentCompany(company);
+    toast.success(`Alternado para ${companyInfo[company].name}`);
+  };
+
   const userInitials = user?.email
     ? user.email.slice(0, 2).toUpperCase()
     : "??";
 
+  const currentInfo = companyInfo[currentCompany];
+  const availableCompanies = isAdmin ? (["conto", "amplia"] as Company[]) : allowedCompanies;
+  const canSwitch = availableCompanies.length > 1;
+
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border">
       <div className="flex h-full flex-col">
-        {/* Logo and Project Dropdown */}
-        <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary">
-            <Building2 className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div className="flex flex-col items-start">
-            <span className="text-lg font-bold text-sidebar-foreground">Conto</span>
-            <span className="ml-1 text-xs text-sidebar-foreground/50">
-              Project Management
-            </span>
-          </div>
+        {/* Logo and Company Dropdown */}
+        <div className="flex h-16 items-center border-b border-sidebar-border px-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger 
+              className={cn(
+                "flex items-center gap-3 w-full rounded-lg px-2 py-2 transition-colors",
+                canSwitch && "hover:bg-sidebar-accent cursor-pointer"
+              )}
+              disabled={!canSwitch}
+            >
+              <div className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-lg",
+                currentInfo.gradient
+              )}>
+                <Building2 className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex flex-col items-start flex-1 min-w-0">
+                <span className="text-lg font-bold text-sidebar-foreground truncate">
+                  {currentInfo.name}
+                </span>
+                <span className="text-xs text-sidebar-foreground/50">
+                  Project Management
+                </span>
+              </div>
+              {canSwitch && (
+                <ChevronDown className="h-4 w-4 text-sidebar-foreground/50 flex-shrink-0" />
+              )}
+            </DropdownMenuTrigger>
+            {canSwitch && (
+              <DropdownMenuContent 
+                align="start" 
+                className="w-56 bg-popover border-border"
+                sideOffset={8}
+              >
+                {availableCompanies.map((company) => (
+                  <DropdownMenuItem
+                    key={company}
+                    onClick={() => handleCompanyChange(company)}
+                    className="cursor-pointer flex items-center gap-3 py-3"
+                  >
+                    <div className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-lg",
+                      companyInfo[company].gradient
+                    )}>
+                      <Building2 className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="flex flex-col flex-1">
+                      <span className="font-medium">{companyInfo[company].name}</span>
+                      <span className="text-xs text-muted-foreground">Project Management</span>
+                    </div>
+                    {currentCompany === company && (
+                      <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            )}
+          </DropdownMenu>
         </div>
 
         {/* Navigation */}
