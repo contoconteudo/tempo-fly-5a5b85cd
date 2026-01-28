@@ -44,6 +44,9 @@ export function useAuth() {
 
     setUser(authUser);
     localStorage.setItem(MOCK_STORAGE_KEYS.CURRENT_USER, JSON.stringify(authUser));
+    
+    // Disparar evento para notificar outros componentes sobre mudança de usuário
+    window.dispatchEvent(new CustomEvent("auth-user-changed", { detail: authUser }));
   }, []);
 
   const signUp = useCallback(async (email: string, password: string): Promise<void> => {
@@ -72,6 +75,9 @@ export function useAuth() {
   const signOut = useCallback(async () => {
     setUser(null);
     localStorage.removeItem(MOCK_STORAGE_KEYS.CURRENT_USER);
+    
+    // Disparar evento para notificar outros componentes sobre logout
+    window.dispatchEvent(new CustomEvent("auth-user-changed", { detail: null }));
   }, []);
 
   return {
