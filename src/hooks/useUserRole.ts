@@ -164,8 +164,8 @@ export function useUserRole(): UseUserRoleReturn {
     }
   }, [user?.id, role]);
 
-  const updateUserRole = useCallback((userId: string, newRole: AppRole) => {
-    console.log(`Role do usuário ${userId} alterada para ${newRole}`);
+  const updateUserRole = useCallback((_userId: string, _newRole: AppRole) => {
+    // Role update - será implementado com backend real
   }, []);
 
   return {
