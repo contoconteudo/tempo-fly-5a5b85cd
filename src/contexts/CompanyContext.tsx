@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { MOCK_USERS, USER_PERMISSIONS_KEY, CompanyAccess } from "@/data/mockData";
 
 export type Company = CompanyAccess;
@@ -34,65 +34,81 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
   const [allowedCompanies, setAllowedCompanies] = useState<Company[]>(["conto", "amplia"]);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Carregar permissões do usuário atual
-  useEffect(() => {
-    const loadUserPermissions = () => {
-      const savedCompany = localStorage.getItem(STORAGE_KEY) as Company | null;
-      const currentUserJson = localStorage.getItem(CURRENT_USER_KEY);
-      
-      if (!currentUserJson) {
-        // Sem usuário logado, usar defaults
-        setAllowedCompanies(["conto", "amplia"]);
-        setIsAdmin(false);
-        return;
-      }
+  // Função para carregar permissões do usuário atual
+  const loadUserPermissions = useCallback(() => {
+    const currentUserJson = localStorage.getItem(CURRENT_USER_KEY);
+    
+    if (!currentUserJson) {
+      // Sem usuário logado, resetar para defaults
+      setAllowedCompanies([]);
+      setIsAdmin(false);
+      return;
+    }
 
-      try {
-        const currentUser = JSON.parse(currentUserJson);
-        const mockUser = MOCK_USERS.find((u) => u.id === currentUser.id);
-        
-        if (mockUser) {
-          // Admin tem acesso a tudo
-          if (mockUser.role === "admin") {
-            setIsAdmin(true);
-            setAllowedCompanies(["conto", "amplia"]);
-          } else {
-            setIsAdmin(false);
-            
-            // Verificar permissões salvas ou usar default do mock
-            const savedPermissions = getSavedPermissions();
-            const userPerms = savedPermissions[currentUser.id];
-            
-            if (userPerms?.companies) {
-              setAllowedCompanies(userPerms.companies);
-            } else {
-              setAllowedCompanies(mockUser.companies);
+    try {
+      const currentUser = JSON.parse(currentUserJson);
+      const mockUser = MOCK_USERS.find((u) => u.id === currentUser.id);
+      
+      if (mockUser) {
+        // Admin tem acesso a tudo
+        if (mockUser.role === "admin") {
+          setIsAdmin(true);
+          setAllowedCompanies(["conto", "amplia"]);
+        } else {
+          setIsAdmin(false);
+          
+          // Verificar permissões salvas ou usar default do mock
+          const savedPermissions = getSavedPermissions();
+          const userPerms = savedPermissions[currentUser.id];
+          
+          if (userPerms?.companies && userPerms.companies.length > 0) {
+            setAllowedCompanies(userPerms.companies);
+            // Se empresa atual não está nas permitidas, mudar para a primeira permitida
+            if (!userPerms.companies.includes(currentCompany)) {
+              setCurrentCompanyState(userPerms.companies[0]);
+              localStorage.setItem(STORAGE_KEY, userPerms.companies[0]);
             }
+          } else if (mockUser.companies && mockUser.companies.length > 0) {
+            setAllowedCompanies(mockUser.companies);
+            // Se empresa atual não está nas permitidas, mudar para a primeira permitida
+            if (!mockUser.companies.includes(currentCompany)) {
+              setCurrentCompanyState(mockUser.companies[0]);
+              localStorage.setItem(STORAGE_KEY, mockUser.companies[0]);
+            }
+          } else {
+            setAllowedCompanies([]);
           }
         }
-      } catch {
-        setAllowedCompanies(["conto", "amplia"]);
+      } else {
+        // Usuário não encontrado no mock - sem permissões
+        setAllowedCompanies([]);
         setIsAdmin(false);
       }
+    } catch {
+      setAllowedCompanies([]);
+      setIsAdmin(false);
+    }
+  }, [currentCompany]);
 
-      // Restaurar empresa selecionada
-      if (savedCompany && ["conto", "amplia"].includes(savedCompany)) {
-        setCurrentCompanyState(savedCompany);
-      }
-    };
-
+  // Carregar permissões na inicialização
+  useEffect(() => {
+    const savedCompany = localStorage.getItem(STORAGE_KEY) as Company | null;
+    if (savedCompany && ["conto", "amplia"].includes(savedCompany)) {
+      setCurrentCompanyState(savedCompany);
+    }
+    
     loadUserPermissions();
+  }, []);
 
-    // Escutar mudanças no localStorage (quando permissões são atualizadas)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === USER_PERMISSIONS_KEY || e.key === CURRENT_USER_KEY) {
-        loadUserPermissions();
-      }
+  // Escutar evento de mudança de usuário (login/logout)
+  useEffect(() => {
+    const handleAuthChange = () => {
+      loadUserPermissions();
     };
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+    window.addEventListener("auth-user-changed", handleAuthChange);
+    return () => window.removeEventListener("auth-user-changed", handleAuthChange);
+  }, [loadUserPermissions]);
 
   const setCurrentCompany = (company: Company) => {
     // Verificar se o usuário tem acesso a essa empresa

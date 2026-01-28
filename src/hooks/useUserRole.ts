@@ -51,12 +51,9 @@ export function useUserRole(): UseUserRoleReturn {
   const [userCompanies, setUserCompanies] = useState<CompanyAccess[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (authLoading) {
-      return;
-    }
-
-    if (!user) {
+  // Função para carregar permissões do usuário
+  const loadPermissions = useCallback((currentUser: { id: string } | null) => {
+    if (!currentUser) {
       setRole(null);
       setUserModules([]);
       setUserCompanies([]);
@@ -65,7 +62,7 @@ export function useUserRole(): UseUserRoleReturn {
     }
 
     // Busca role do usuário nos dados mockados
-    const mockUser = MOCK_USERS.find((u) => u.id === user.id);
+    const mockUser = MOCK_USERS.find((u) => u.id === currentUser.id);
     
     if (mockUser) {
       setRole(mockUser.role);
@@ -77,7 +74,7 @@ export function useUserRole(): UseUserRoleReturn {
       } else {
         // Para outros usuários, verificar permissões salvas ou usar default
         const savedPermissions = getSavedPermissions();
-        const userSavedPerms = savedPermissions[user.id];
+        const userSavedPerms = savedPermissions[currentUser.id];
         
         if (userSavedPerms) {
           setUserModules(userSavedPerms.modules || []);
@@ -96,7 +93,26 @@ export function useUserRole(): UseUserRoleReturn {
     }
     
     setIsLoading(false);
-  }, [user, authLoading]);
+  }, []);
+
+  // Carregar permissões quando user mudar
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    loadPermissions(user);
+  }, [user, authLoading, loadPermissions]);
+
+  // Escutar evento de mudança de auth para recarregar permissões
+  useEffect(() => {
+    const handleAuthChange = (event: CustomEvent) => {
+      loadPermissions(event.detail);
+    };
+
+    window.addEventListener("auth-user-changed", handleAuthChange as EventListener);
+    return () => window.removeEventListener("auth-user-changed", handleAuthChange as EventListener);
+  }, [loadPermissions]);
 
   const hasRole = (checkRole: AppRole): boolean => role === checkRole;
 
@@ -139,8 +155,8 @@ export function useUserRole(): UseUserRoleReturn {
       const savedPerms = savedPermissions[user.id];
       return {
         ...user,
-        modules: savedPerms?.modules || user.modules,
-        companies: savedPerms?.companies || user.companies,
+        modules: savedPerms?.modules ?? user.modules,
+        companies: savedPerms?.companies ?? user.companies,
       };
     });
   }, []);
