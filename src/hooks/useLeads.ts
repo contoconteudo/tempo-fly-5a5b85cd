@@ -1,49 +1,57 @@
 import { useLocalStorage } from "./useLocalStorage";
 import { Lead, LeadStage } from "@/types";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { STORAGE_KEYS, AUTOMATION_CONFIG } from "@/lib/constants";
 import { MOCK_LEADS } from "@/data/mockData";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export function useLeads() {
-  const [leads, setLeads] = useLocalStorage<Lead[]>(STORAGE_KEYS.LEADS, MOCK_LEADS);
+  const [allLeads, setAllLeads] = useLocalStorage<Lead[]>(STORAGE_KEYS.LEADS, MOCK_LEADS);
+  const { currentCompany } = useCompany();
+
+  // Filtrar leads pelo espaço atual
+  const leads = useMemo(() => {
+    return allLeads.filter((lead) => lead.company_id === currentCompany);
+  }, [allLeads, currentCompany]);
 
   const addLead = useCallback(
-    (data: Omit<Lead, "id" | "createdAt" | "stageChangedAt" | "project_id" | "user_id">) => {
+    (data: Omit<Lead, "id" | "createdAt" | "stageChangedAt" | "project_id" | "user_id" | "company_id">) => {
       const now = new Date().toISOString();
       const newLead: Lead = {
         ...data,
         id: crypto.randomUUID(),
         project_id: "default",
         user_id: "current-user",
+        company_id: currentCompany,
         createdAt: now.split("T")[0],
         stageChangedAt: now,
       };
-      setLeads((prev) => [...prev, newLead]);
+      setAllLeads((prev) => [...prev, newLead]);
       return newLead;
     },
-    [setLeads]
+    [setAllLeads, currentCompany]
   );
 
   const updateLead = useCallback(
-    (id: string, data: Partial<Omit<Lead, "id" | "createdAt" | "project_id" | "user_id">>) => {
-      setLeads((prev) =>
+    (id: string, data: Partial<Omit<Lead, "id" | "createdAt" | "project_id" | "user_id" | "company_id">>) => {
+      setAllLeads((prev) =>
         prev.map((lead) => (lead.id === id ? { ...lead, ...data } : lead))
       );
     },
-    [setLeads]
+    [setAllLeads]
   );
 
   const deleteLead = useCallback(
     (id: string) => {
-      setLeads((prev) => prev.filter((lead) => lead.id !== id));
+      setAllLeads((prev) => prev.filter((lead) => lead.id !== id));
     },
-    [setLeads]
+    [setAllLeads]
   );
 
   const moveLeadToStage = useCallback(
     (id: string, stage: LeadStage) => {
       const now = new Date().toISOString();
-      setLeads((prev) =>
+      setAllLeads((prev) =>
         prev.map((lead) =>
           lead.id === id
             ? { ...lead, stage, lastContact: now.split("T")[0], stageChangedAt: now }
@@ -51,7 +59,7 @@ export function useLeads() {
         )
       );
     },
-    [setLeads]
+    [setAllLeads]
   );
 
   const getLeadsByStage = useCallback(
@@ -86,7 +94,7 @@ export function useLeads() {
       const now = new Date().getTime();
       const thresholdMs = AUTOMATION_CONFIG.PROPOSAL_TO_FOLLOWUP_HOURS * 60 * 60 * 1000;
 
-      setLeads((prevLeads) => {
+      setAllLeads((prevLeads) => {
         let changed = false;
         const updatedLeads = prevLeads.map((lead) => {
           if (lead.stage === "proposal") {
@@ -113,7 +121,7 @@ export function useLeads() {
     const interval = setInterval(checkAndMoveLeads, AUTOMATION_CONFIG.AUTOMATION_CHECK_INTERVAL);
 
     return () => clearInterval(interval);
-  }, [setLeads]);
+  }, [setAllLeads]);
 
   return {
     leads,
