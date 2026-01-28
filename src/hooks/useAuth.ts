@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { MOCK_USERS, MockUser, MOCK_STORAGE_KEYS } from "@/data/mockData";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // Tipo simplificado do usuário para a interface
 export interface AuthUser {
@@ -11,93 +12,105 @@ export interface AuthUser {
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [session, setSession] = useState<any>(null);
 
-  // Carrega usuário do localStorage na inicialização
+  // Carrega sessão inicial e monitora mudanças
   useEffect(() => {
-    const savedUser = localStorage.getItem(MOCK_STORAGE_KEYS.CURRENT_USER);
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        setUser(parsed);
-      } catch {
-        localStorage.removeItem(MOCK_STORAGE_KEYS.CURRENT_USER);
-      }
+    if (!isSupabaseConfigured) {
+      // Se não configurado, permanece no modo mock (embora o Login.tsx precise ser atualizado)
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      if (session?.user) {
+        const authUser: AuthUser = {
+          id: session.user.id,
+          email: session.user.email || "",
+          full_name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || "",
+        };
+        setUser(authUser);
+        // Disparar evento para notificar outros hooks (como useUserRole e CompanyContext)
+        window.dispatchEvent(new CustomEvent("auth-user-changed", { detail: authUser }));
+      } else {
+        setUser(null);
+        window.dispatchEvent(new CustomEvent("auth-user-changed", { detail: null }));
+      }
+      setIsLoading(false);
+    });
+
+    // Carregar sessão inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        const authUser: AuthUser = {
+          id: session.user.id,
+          email: session.user.email || "",
+          full_name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || "",
+        };
+        setUser(authUser);
+      }
+      setIsLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string): Promise<void> => {
-    // Busca usuário mockado
-    const foundUser = MOCK_USERS.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-
-    if (!foundUser) {
-      throw new Error("Email ou senha incorretos");
+    if (!isSupabaseConfigured) {
+      throw new Error("Supabase não configurado. Verifique as variáveis de ambiente.");
     }
-
-    const authUser: AuthUser = {
-      id: foundUser.id,
-      email: foundUser.email,
-      full_name: foundUser.full_name,
-    };
-
-    setUser(authUser);
-    localStorage.setItem(MOCK_STORAGE_KEYS.CURRENT_USER, JSON.stringify(authUser));
     
-    // Disparar evento para notificar outros componentes sobre mudança de usuário
-    window.dispatchEvent(new CustomEvent("auth-user-changed", { detail: authUser }));
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      throw new Error(error.message);
+    }
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string): Promise<void> => {
-    // Verifica se email já existe nos usuários mockados
-    const existsInMock = MOCK_USERS.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
-
-    if (existsInMock) {
-      throw new Error("Este e-mail já está cadastrado no sistema");
+  const signUp = useCallback(async (email: string, password: string, options?: { full_name?: string }): Promise<void> => {
+    if (!isSupabaseConfigured) {
+      throw new Error("Supabase não configurado. Verifique as variáveis de ambiente.");
     }
-
-    // Verifica se já existe um usuário criado com este email no localStorage
-    const registeredUsersStr = localStorage.getItem(MOCK_STORAGE_KEYS.REGISTERED_USERS);
-    const registeredUsers: AuthUser[] = registeredUsersStr ? JSON.parse(registeredUsersStr) : [];
     
-    const existsInRegistered = registeredUsers.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: options?.full_name || email.split('@')[0],
+        },
+      },
+    });
 
-    if (existsInRegistered) {
-      throw new Error("Este e-mail já está cadastrado no sistema");
+    if (error) {
+      throw new Error(error.message);
     }
-
-    // Cria novo usuário
-    const newUser: AuthUser = {
-      id: `user-new-${Date.now()}`,
-      email: email,
-      full_name: email.split("@")[0],
-    };
-
-    // Salva na lista de usuários registrados
-    registeredUsers.push(newUser);
-    localStorage.setItem(MOCK_STORAGE_KEYS.REGISTERED_USERS, JSON.stringify(registeredUsers));
-
-    // Loga o usuário
-    setUser(newUser);
-    localStorage.setItem(MOCK_STORAGE_KEYS.CURRENT_USER, JSON.stringify(newUser));
+    
+    toast.info("Verifique seu email para confirmar o cadastro.", { duration: 5000 });
   }, []);
 
   const signOut = useCallback(async () => {
-    setUser(null);
-    localStorage.removeItem(MOCK_STORAGE_KEYS.CURRENT_USER);
+    if (!isSupabaseConfigured) {
+      setUser(null);
+      setSession(null);
+      return;
+    }
     
-    // Disparar evento para notificar outros componentes sobre logout
-    window.dispatchEvent(new CustomEvent("auth-user-changed", { detail: null }));
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      throw new Error(error.message);
+    }
+    setUser(null);
+    setSession(null);
   }, []);
 
   return {
     user,
-    session: user ? { user } : null, // Compatibilidade com interface anterior
+    session,
     isLoading,
     signIn,
     signUp,

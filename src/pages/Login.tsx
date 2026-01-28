@@ -6,28 +6,41 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { isSupabaseConfigured } from "@/integrations/supabase/client";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, isAuthenticated } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+
+  // Redirecionar se já estiver autenticado
+  if (isAuthenticated) {
+    navigate("/", { replace: true });
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
+    if (!isSupabaseConfigured) {
+      toast.error("O Supabase não está configurado. Verifique as variáveis de ambiente.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (isSignUp) {
-        await signUp(email, password);
-        toast.success("Conta criada com sucesso!");
-        navigate("/");
+        await signUp(email, password, { full_name: fullName });
+        toast.success("Verifique seu email para confirmar o cadastro. Após a confirmação, faça login.");
+        setIsSignUp(false); // Volta para a tela de login
       } else {
         await signIn(email, password);
-        toast.success("Login realizado com sucesso!");
-        navigate("/");
+        // O redirecionamento é tratado pelo hook useAuth e ProtectedRoute
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao processar solicitação");
@@ -50,6 +63,22 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="full_name" className="text-sm">Nome Completo</Label>
+                <Input
+                  id="full_name"
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Seu Nome"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="h-11 md:h-10"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm">Email</Label>
               <Input

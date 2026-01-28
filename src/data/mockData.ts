@@ -44,38 +44,8 @@ export interface MockUser {
  */
 const DEMO_MODE_ONLY = import.meta.env.DEV || !import.meta.env.VITE_SUPABASE_URL;
 
-export const MOCK_USERS: MockUser[] = DEMO_MODE_ONLY ? [
-  {
-    id: "user-admin-001",
-    email: "admin@conto.com.br",
-    password: "123456",
-    full_name: "Administrador",
-    role: "admin",
-    modules: ["dashboard", "strategy", "crm", "clients", "settings", "admin"],
-    companies: ["conto", "amplia"],
-    created_at: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "user-gestor-001",
-    email: "gestor@conto.com.br",
-    password: "gestor123",
-    full_name: "Maria Gestora",
-    role: "gestor",
-    modules: ["dashboard", "strategy", "crm", "clients"],
-    companies: ["conto", "amplia"],
-    created_at: "2024-01-15T00:00:00Z",
-  },
-  {
-    id: "user-comercial-001",
-    email: "comercial@conto.com.br",
-    password: "comercial123",
-    full_name: "João Vendas",
-    role: "comercial",
-    modules: ["dashboard", "crm", "clients"],
-    companies: ["conto"],
-    created_at: "2024-02-01T00:00:00Z",
-  },
-] : [];
+// Usuários mockados removidos. A autenticação agora depende do Supabase.
+export const MOCK_USERS: MockUser[] = [];
 
 // ============================================
 // PERMISSÕES - Configuração de módulos
@@ -102,9 +72,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, ModulePermission[]> = {
 
 export const USER_PERMISSIONS_KEY = "conto-user-permissions";
 
+// Chaves de autenticação mockadas removidas, pois useAuth não as usa mais.
 export const MOCK_STORAGE_KEYS = {
-  CURRENT_USER: "conto-current-user",
-  REGISTERED_USERS: "conto-registered-users",
+  CURRENT_USER: "conto-current-user-deprecated",
+  REGISTERED_USERS: "conto-registered-users-deprecated",
 } as const;
 
 // ============================================
