@@ -3,6 +3,7 @@ import { Client, NPSRecord, ClientStatus } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "./useAuth";
+import { toast } from "sonner";
 
 // Helper function to calculate average NPS from history
 export function calculateClientNPS(npsHistory: NPSRecord[]): number {
@@ -183,12 +184,14 @@ export function useClients() {
 
     if (error) {
       console.error("Erro ao atualizar cliente:", error);
+      toast.error("Erro ao atualizar cliente. Tente novamente.");
       return;
     }
 
     setClients(prev => prev.map(client => 
       client.id === id ? { ...client, ...data } : client
     ));
+    toast.success("Cliente atualizado com sucesso!");
   }, []);
 
   const deleteClient = useCallback(async (id: string) => {
@@ -199,10 +202,12 @@ export function useClients() {
 
     if (error) {
       console.error("Erro ao excluir cliente:", error);
+      toast.error("Erro ao excluir cliente. Tente novamente.");
       return;
     }
 
     setClients(prev => prev.filter(client => client.id !== id));
+    toast.success("Cliente excluído com sucesso!");
   }, []);
 
   const addNPSRecord = useCallback(async (

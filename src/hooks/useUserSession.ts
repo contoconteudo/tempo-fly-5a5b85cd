@@ -102,8 +102,9 @@ async function fetchUserSession(userId: string): Promise<Omit<UserSession, "user
     const role = (roleResult.data?.role as AppRole) || null;
     const isAdmin = role === "admin";
 
-    const rawModules = (permResult.data as any)?.allowed_modules ?? (permResult.data as any)?.modules ?? [];
-    const rawSpaces = (permResult.data as any)?.allowed_spaces ?? (permResult.data as any)?.spaces ?? [];
+    // Schema padronizado: usar apenas 'modules' e 'spaces'
+    const rawModules = (permResult.data as any)?.modules ?? [];
+    const rawSpaces = (permResult.data as any)?.spaces ?? [];
     
     // Se admin, tem acesso total
     if (isAdmin) {

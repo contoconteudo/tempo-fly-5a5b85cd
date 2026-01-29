@@ -3,6 +3,7 @@ import { Lead, LeadStage } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "./useAuth";
+import { toast } from "sonner";
 
 export function useLeads() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -145,12 +146,14 @@ export function useLeads() {
 
     if (error) {
       console.error("Erro ao atualizar lead:", error);
+      toast.error("Erro ao atualizar lead. Tente novamente.");
       return;
     }
 
     setLeads(prev => prev.map(lead => 
       lead.id === id ? { ...lead, ...data } : lead
     ));
+    toast.success("Lead atualizado com sucesso!");
   }, []);
 
   const deleteLead = useCallback(async (id: string) => {
@@ -161,10 +164,12 @@ export function useLeads() {
 
     if (error) {
       console.error("Erro ao excluir lead:", error);
+      toast.error("Erro ao excluir lead. Tente novamente.");
       return;
     }
 
     setLeads(prev => prev.filter(lead => lead.id !== id));
+    toast.success("Lead excluído com sucesso!");
   }, []);
 
   const moveLeadToStage = useCallback(async (id: string, stage: LeadStage) => {
