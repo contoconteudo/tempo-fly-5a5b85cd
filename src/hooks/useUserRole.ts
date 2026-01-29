@@ -74,9 +74,8 @@ export function useUserRole(): UseUserRoleReturn {
         .select("user_id, role")
         .in("user_id", userIds),
       supabase
-        // Select * para tolerar drift de schema (modules/spaces vs allowed_modules/allowed_spaces)
         .from("user_permissions")
-        .select("*")
+        .select("user_id, modules, spaces")
         .in("user_id", userIds),
     ]);
 
@@ -97,8 +96,9 @@ export function useUserRole(): UseUserRoleReturn {
 
     return profileList.map((profile) => {
       const perm = permByUser.get(profile.id);
-      const modules = (perm?.allowed_modules ?? perm?.modules ?? []) as ModulePermission[];
-      const companies = (perm?.allowed_spaces ?? perm?.spaces ?? []) as CompanyAccess[];
+      // Schema padronizado: usar apenas 'modules' e 'spaces'
+      const modules = (perm?.modules ?? []) as ModulePermission[];
+      const companies = (perm?.spaces ?? []) as CompanyAccess[];
 
       return {
         ...profile,
@@ -123,12 +123,12 @@ export function useUserRole(): UseUserRoleReturn {
     if (existing) {
       await supabase
         .from("user_permissions")
-        .update({ allowed_modules: modules, allowed_spaces: companies, updated_at: new Date().toISOString() })
+        .update({ modules, spaces: companies, updated_at: new Date().toISOString() })
         .eq("user_id", userId);
     } else {
       await supabase
         .from("user_permissions")
-        .insert({ user_id: userId, allowed_modules: modules, allowed_spaces: companies });
+        .insert({ user_id: userId, modules, spaces: companies });
     }
 
     // Se for o usuário atual, invalidar cache

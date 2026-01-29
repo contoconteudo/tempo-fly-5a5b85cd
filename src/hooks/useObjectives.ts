@@ -5,6 +5,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "./useAuth";
 import { useLeads } from "./useLeads";
 import { useClients } from "./useClients";
+import { toast } from "sonner";
 
 function calculateStatus(currentValue: number, targetValue: number, deadline: string): ObjectiveStatus {
   const progress = (currentValue / targetValue) * 100;
@@ -227,6 +228,7 @@ export function useObjectives() {
 
     if (error) {
       console.error("Erro ao atualizar objetivo:", error);
+      toast.error("Erro ao atualizar objetivo. Tente novamente.");
       return;
     }
 
@@ -236,6 +238,7 @@ export function useObjectives() {
       updated.status = calculateStatus(updated.currentValue, updated.targetValue, updated.deadline);
       return updated;
     }));
+    toast.success("Objetivo atualizado com sucesso!");
   }, []);
 
   const deleteObjective = useCallback(async (id: string) => {
@@ -246,10 +249,12 @@ export function useObjectives() {
 
     if (error) {
       console.error("Erro ao excluir objetivo:", error);
+      toast.error("Erro ao excluir objetivo. Tente novamente.");
       return;
     }
 
     setObjectives(prev => prev.filter(obj => obj.id !== id));
+    toast.success("Objetivo excluído com sucesso!");
   }, []);
 
   const addProgressLog = useCallback(async (
